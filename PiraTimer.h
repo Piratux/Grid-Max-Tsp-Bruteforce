@@ -66,6 +66,14 @@ private:
 			return averages.first / (double)averages.second;
 		}
 
+		double get_total() {
+			// can happen, when timer was started, but was never ended
+			if (averages.second == 0)
+				return 0;
+
+			return averages.first;
+		}
+
 		double get_median() {
 			return calculated_median;
 		}
@@ -81,7 +89,7 @@ private:
 	static const int spaces_between_words = 3;
 
 	// Some duration stats that are added in end() function
-	static std::map<std::string, Stats> stats;
+	static inline std::map<std::string, Stats> stats;
 
 public:
 	static void start(const std::string& description) {
@@ -110,6 +118,7 @@ public:
 		size_t max_description_length = 0;
 		size_t max_average_length = 0;
 		size_t max_median_length = 0;
+		size_t max_total_length = 0;
 		for (auto it = stats.begin(); it != stats.end(); ++it) {
 			total_ms += it->second.get_average();
 			it->second.calculate_median();
@@ -117,6 +126,7 @@ public:
 			max_description_length = std::max(max_description_length, it->first.length());
 			max_average_length = std::max(max_average_length, get_num_len(it->second.get_average()));
 			max_median_length = std::max(max_median_length, get_num_len(it->second.get_median()));
+			max_total_length = std::max(max_total_length, get_num_len(it->second.get_total()));
 		}
 
 		std::cout << std::fixed << std::setprecision(decimal_precision);
@@ -125,6 +135,7 @@ public:
 
 			std::cout << "Average: " << it->second.get_average() << " ms" << std::string(max_average_length - get_num_len(it->second.get_average()) + spaces_between_words, ' ');
 			std::cout << "Median: " << it->second.get_median() << " ms" << std::string(max_median_length - get_num_len(it->second.get_median()) + spaces_between_words, ' ');
+			std::cout << "Total: " << it->second.get_total() << " ms" << std::string(max_total_length - get_num_len(it->second.get_total()) + spaces_between_words, ' ');
 			std::cout << "Total measured: " << it->second.get_count() << '\n';
 		}
 
@@ -135,5 +146,3 @@ public:
 		stats.clear();
 	}
 };
-
-std::map<std::string, PiraTimer::Stats> PiraTimer::stats;

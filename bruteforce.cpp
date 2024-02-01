@@ -1,3 +1,7 @@
+// optimisations:
+// - precalculate intersections table
+// ? precalculate max distances (for early max distance pruning)
+
 // Code made for finding best Hamiltonian cycle to satisfy maximise d(G) functions.
 // Functions and problem described here: https://piratux.github.io/connect_points/
 
@@ -342,6 +346,16 @@ void print_coordinate_array(const std::vector<int>& solution, int size) {
     std::cout << std::endl;
 }
 
+int find_max_possible_path_length(const std::vector<PathInfo>& sorted_distances, int size) {
+    int squared_size = size * size;
+    int max_path_length = 0;
+    for (int i = 0; i < squared_size; i++) {
+        max_path_length += sorted_distances[i * squared_size].path_length;
+    }
+
+    return max_path_length;
+}
+
 // Possible optimisations:
 // - Return early if sum of additional path lengths won't exceed best path that was found (not sure if worth it)
 // - If all inner grid indexes are taken and edge index was just connected, attempt to immediately calculate path length (for c(G), remaining sum would need to be pre-calculated)
@@ -355,6 +369,7 @@ std::vector<int> find_best_solution(const std::vector<PathInfo>& sorted_distance
     }
 
     int squared_size = size * size;
+    int total_outter_points = (size - 1) * 4;
     
     // 0 = free
     // 1 = taken
@@ -371,11 +386,17 @@ std::vector<int> find_best_solution(const std::vector<PathInfo>& sorted_distance
 
     // Create lookup table to quickly check if vertex index is on the edge of the grid
     std::vector<int> edge_lookup_table = create_lookup_table(size);
-    int total_grid_edge_points = 4 * (size - 1);
+    std::vector<int> reverse_edge_lookup_table = create_reverse_lookup_table(size);
 
-    int best_path_length = 0;
+    int max_possible_path_length = find_max_possible_path_length(sorted_distances, size);
+    std::cout << "Max path length: " << max_possible_path_length << std::endl;
+
+    int best_path_length = 205;
 
     long long total_found = 0;
+
+    int temp_id = 0;
+    PiraTimer::start("find_best_solution" + std::to_string(temp_id));
 
     auto check_if_new_vertex_creates_intersections = [&](int new_idx, bool add_last_path) -> bool {
         // Check if there are any intersections with new path with all other ones
@@ -400,35 +421,64 @@ std::vector<int> find_best_solution(const std::vector<PathInfo>& sorted_distance
         return false;
     };
 
+    auto point_is_reachable = [&](int idx_to_check, int last_outter_grid_idx, int next_outter_grid_idx) {
+        bool reachable = true;
+
+        Point point_outside_grid = { -1, -1 };
+        Point current_point = make_2D_index(idx_to_check, size);
+        Point p3;
+        Point p4;
+
+        // Travel backwards the edge chain, essentially checking if polygon formed via edges contains the point
+        for (int i = path_indexes.size() - 1; path_indexes[i] != last_outter_grid_idx; i--) {
+            p3 = make_2D_index(path_indexes[i], size);
+            p4 = make_2D_index(path_indexes[i - 1], size);
+            if (segments_intersect(point_outside_grid, current_point, p3, p4)) {
+                reachable = !reachable;
+            }
+        }
+
+        // path_indexes don't contain 2 polygon edges, so we have to check them manually
+        p3 = make_2D_index(last_outter_grid_idx, size);
+        p4 = make_2D_index(next_outter_grid_idx, size);
+        if (segments_intersect(point_outside_grid, current_point, p3, p4)) {
+            reachable = !reachable;
+        }
+
+        p3 = make_2D_index(path_indexes.back(), size);
+        p4 = make_2D_index(next_outter_grid_idx, size);
+        if (segments_intersect(point_outside_grid, current_point, p3, p4)) {
+            reachable = !reachable;
+        }
+
+        return reachable;
+    };
+
     auto find_best = [&](auto& self, int last_idx, int path_length, int next_expected_grid_edge_idx) {
+        if (max_possible_path_length + path_length < best_path_length) {
+            return;
+        }
+
         // Check if last path was added
         if (path_indexes.size() == squared_size + 1) {
 			total_found++;
-			
-			// if(total_found % 1000000 == 0){
-				// std::cout << "Total paths checked: " << total_found << std::endl;
-			// }
-			
-			// std::cout << "Total paths checked: " << total_found << std::endl;
-			
-			// if(total_found % 10 == 0){
-				// std::cout << "Total paths checked: " << total_found << std::endl;
-			// }
 			
             if (path_length > best_path_length) {
                 best_path_length = path_length;
                 best_path_indexes = path_indexes;
 				
+                PiraTimer::end("find_best_solution" + std::to_string(temp_id));
+                PiraTimer::print_stats();
 				
 				std::cout << "Total paths checked: " << total_found << std::endl;
 				std::cout << "Best path length: " << best_path_length << std::endl;
 				std::cout << "Best path length solution connections pairs: ";
 				print_coordinate_array(path_indexes, size);
+
+                temp_id++;
+                PiraTimer::start("find_best_solution" + std::to_string(temp_id));
             }
 			
-			// std::cout << "Best path length solution connections pairs: ";
-			// print_coordinate_array(path_indexes, size);
-
             return;
         }
 
@@ -466,39 +516,70 @@ std::vector<int> find_best_solution(const std::vector<PathInfo>& sorted_distance
                 // Optimisation: If paths divide the grid with unreachable spots, return.
                 // Check if point is on edge
                 int transformed_idx = edge_lookup_table[new_idx];
-                if (transformed_idx < total_grid_edge_points) {
+                if (transformed_idx < total_outter_points) {
                     point_is_on_edge = true;
                 }
 
-                // Check if grid now has unreachable points
-                if (point_is_on_edge && next_expected_grid_edge_idx != transformed_idx) {
-                    continue;
+                if (point_is_on_edge) {
+                    // Check if grid now has unreachable points
+                    if (next_expected_grid_edge_idx != transformed_idx) {
+                        continue;
+                    }
+                    
+                    // Check if now there are unconnectable points surrounded by polygon formed by 2 outter grid points
+
+                    // Small optimisation: we know that if 2 adjacent outter grid points were just connected, we don't need
+                    // to check for unconnectable points, since they could not have appeared
+                    if (new_idx + 1 != next_expected_grid_edge_idx) {
+                        bool isolated_point_found = false;
+
+                        // Iterate over inner grid points
+                        for (int j = total_outter_points; j < squared_size; j++) {
+                            int inner_grid_idx = reverse_edge_lookup_table[j];
+                            if (taken_vertex_map[inner_grid_idx] == 0) {
+                                if (point_is_reachable(inner_grid_idx, reverse_edge_lookup_table[transformed_idx - 1], new_idx) == false) {
+                                    isolated_point_found = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (isolated_point_found) {
+                            continue;
+                        }
+                    }
                 }
             }
 
+            //PiraTimer::start("check_if_new_vertex_creates_intersections. Grid size: " + std::to_string(size));
             bool result = check_if_new_vertex_creates_intersections(new_idx, add_last_path);
+            //PiraTimer::end("check_if_new_vertex_creates_intersections. Grid size: " + std::to_string(size));
+
             if (result == true) {
                 continue;
             }
 
             path_indexes.push_back(new_idx);
             taken_vertex_map[new_idx] = 1;
+            max_possible_path_length -= sorted_distances[last_idx * squared_size].path_length;
 
             self(self, new_idx, path_length + new_path_length, next_expected_grid_edge_idx + (point_is_on_edge ? 1 : 0));
             
             path_indexes.pop_back();
             taken_vertex_map[new_idx] = 0;
+            max_possible_path_length += sorted_distances[last_idx * squared_size].path_length;
         }
     };
 	
 	// temporary
 	//path_indexes.push_back(27);
 	//taken_vertex_map[27] = 1;
+ //   max_possible_path_length -= sorted_distances[0 * squared_size].path_length;
 	//find_best(find_best, 27, 25, 1);
 	
 	
 
-     find_best(find_best, 0, 0, 1);
+    find_best(find_best, 0, 0, 1);
 	
 	std::cout << "Total paths checked: " << total_found << std::endl;
 
@@ -530,7 +611,7 @@ void find_best_grid_hamiltonian_cycle(int size) {
 }
 
 int main() {
-    for (int i = 3; i <= 5; i++) {
+    for (int i = 4; i <= 4; i++) {
         int grid_size = i;
         PiraTimer::start("Grid size: " + std::to_string(i));
         find_best_grid_hamiltonian_cycle(grid_size);
