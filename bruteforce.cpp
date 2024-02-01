@@ -1,45 +1,9 @@
-// optimisations:
+// Possible optimisations:
 // - precalculate intersections table
-// ? precalculate max distances (for early max distance pruning)
+// - improve cost based pruning, by only counting maximum possible distances with edges that don't intersect and with edges whose vertex isn't taken (not sure if this will improve speed).
 
-// Code made for finding best Hamiltonian cycle to satisfy maximise d(G) functions.
+// Code made for finding best Hamiltonian cycle to satisfy maximise d(G) function.
 // Functions and problem described here: https://piratux.github.io/connect_points/
-
-// best 2x2
-// d(G) = 4
-// 0 1 3 2 0
-// [[1, 0, 0, 0], [1, 1, 1, 0], [0, 1, 1, 1], [0, 0, 0, 1], ]
-// total 0.003 ms
-
-// best 3x3
-// d(G) = 10
-// 0 4 1 2 5 8 7 6 3 0
-// [[1, 1, 0, 0], [1, 0, 1, 1], [2, 0, 1, 0], [2, 1, 2, 0], [2, 2, 2, 1], [1, 2, 2, 2], [0, 2, 1, 2], [0, 1, 0, 2], [0, 0, 0, 1], ]
-// total 0.008 ms
-
-// best 4x4
-// d(G) = 36
-// 0 6 1 2 3 10 7 11 15 9 14 13 12 5 8 4 0
-// [[2, 1, 0, 0], [1, 0, 2, 1], [2, 0, 1, 0], [3, 0, 2, 0], [2, 2, 3, 0], [3, 1, 2, 2], [3, 2, 3, 1], [3, 3, 3, 2], [1, 2, 3, 3], [2, 3, 1, 2], [1, 3, 2, 3], [0, 3, 1, 3], [1, 1, 0, 3], [0, 2, 1, 1], [0, 1, 0, 2], [0, 0, 0, 1], ]
-// total 4 ms
-
-// best 5x5
-// d(G) = 98
-// 0 17 6 12 1 18 7 13 2 3 4 9 14 19 8 24 16 23 22 21 20 11 15 10 5 0
-// [[2, 3, 0, 0], [1, 1, 2, 3], [2, 2, 1, 1], [1, 0, 2, 2], [3, 3, 1, 0], [2, 1, 3, 3], [3, 2, 2, 1], [2, 0, 3, 2], [3, 0, 2, 0], [4, 0, 3, 0], [4, 1, 4, 0], [4, 2, 4, 1], [4, 3, 4, 2], [3, 1, 4, 3], [4, 4, 3, 1], [1, 3, 4, 4], [3, 4, 1, 3], [2, 4, 3, 4], [1, 4, 2, 4], [0, 4, 1, 4], [1, 2, 0, 4], [0, 3, 1, 2], [0, 2, 0, 3], [0, 1, 0, 2], [0, 0, 0, 1], ]
-// total 86 sec
-
-// possibly best 6x6
-// d(G) = 218
-// [[0,0,1,0],[1,0,2,0],[2,0,3,0],[3,0,1,1],[4,0,1,1],[0,0,0,1],[0,1,0,2],[0,2,0,3],[1,2,0,3],[1,2,0,4],[2,1,0,4],[2,1,1,3],[2,2,1,3],[3,1,2,2],[3,1,0,5],[4,4,0,5],[4,4,1,5],[1,5,2,5],[2,5,3,5],[3,5,4,5],[4,5,5,5],[4,3,5,5],[4,3,5,4],[5,3,5,4],[5,2,5,3],[5,1,5,2],[5,1,3,4],[4,2,3,4],[4,2,3,3],[5,0,3,3],[5,0,2,4],[4,1,2,4],[4,1,3,2],[3,2,2,3],[2,3,1,4],[4,0,1,4]]
-
-// possibly best 7x7
-// d(G) = 426
-// [[0,0,1,0],[1,0,2,0],[2,0,3,0],[3,0,4,0],[5,0,1,1],[4,0,1,1],[0,0,0,1],[0,1,0,2],[0,2,0,3],[1,2,0,3],[1,2,0,4],[2,1,0,4],[2,1,1,3],[2,2,1,3],[2,2,0,5],[3,1,0,5],[3,1,1,4],[2,3,1,4],[3,2,2,3],[4,1,3,2],[4,1,0,6],[4,5,0,6],[4,5,1,6],[5,5,1,6],[5,5,2,6],[2,6,3,6],[3,6,4,6],[4,6,5,6],[5,6,6,6],[6,5,6,6],[6,4,6,5],[6,3,6,4],[6,3,5,4],[6,2,5,4],[6,2,5,3],[5,3,4,4],[6,1,4,4],[6,1,3,5],[5,2,3,5],[5,2,4,3],[4,3,3,4],[6,0,3,4],[6,0,2,5],[5,1,2,5],[5,1,4,2],[4,2,3,3],[3,3,2,4],[2,4,1,5],[5,0,1,5]]
-
-// possibly best 8x8
-// d(G) = 768
-// [[0,0,1,0],[1,0,2,0],[2,0,3,0],[3,0,4,0],[4,0,1,1],[5,0,1,1],[5,0,2,1],[6,0,2,1],[0,0,0,1],[0,1,0,2],[0,2,0,3],[1,2,0,3],[1,2,0,4],[1,3,0,4],[2,2,1,3],[2,2,0,5],[3,1,0,5],[3,1,1,4],[2,3,1,4],[3,2,2,3],[3,2,0,6],[4,1,0,6],[4,1,1,5],[2,4,1,5],[3,3,2,4],[4,2,3,3],[5,1,4,2],[5,1,0,7],[5,6,0,7],[5,6,1,7],[6,6,1,7],[6,6,2,7],[2,7,3,7],[3,7,4,7],[4,7,5,7],[5,7,6,7],[6,7,7,7],[7,6,7,7],[7,5,7,6],[7,4,7,5],[7,4,6,5],[7,3,6,5],[7,3,6,4],[6,4,5,5],[7,2,5,5],[7,2,4,6],[6,3,4,6],[6,3,5,4],[5,4,4,5],[7,1,4,5],[7,1,3,6],[6,2,3,6],[6,2,5,3],[5,3,4,4],[7,0,4,4],[7,0,3,5],[6,1,3,5],[6,1,2,6],[5,2,2,6],[5,2,4,3],[4,3,3,4],[3,4,2,5],[2,5,1,6],[6,0,1,6]]
 
 #include <iostream>
 #include <vector>
@@ -79,8 +43,7 @@ void print_array(std::vector<int> vec, int add_new_line_every_x = -1) {
 // 0 --> p, q and r are collinear
 // 1 --> Clockwise
 // 2 --> Counterclockwise
-int orientation(Point p, Point q, Point r)
-{
+int orientation(Point p, Point q, Point r) {
     // See https://www.geeksforgeeks.org/orientation-3-ordered-points/
     // for details of below formula.
     int val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
@@ -91,8 +54,8 @@ int orientation(Point p, Point q, Point r)
 }
 
 // Returns true if line segment 'p1q1' and 'p2q2' intersect (assuming they're not collinear).
-bool segments_intersect(Point p1, Point q1, Point p2, Point q2)
-{
+// NOTE: Returns true if 2 segments share a starting/ending point
+bool segments_intersect(Point p1, Point q1, Point p2, Point q2) {
     int o1 = orientation(p1, q1, p2);
     int o2 = orientation(p1, q1, q2);
     int o3 = orientation(p2, q2, p1);
@@ -295,8 +258,6 @@ std::vector<PathInfo> prune_anti_clockwise_paths(const std::vector<PathInfo>& di
     std::vector<PathInfo> path_distances = distances;
     std::vector<int> lookup_table = create_reverse_lookup_table(size);
 
-    //print_array(lookup_table, size);
-
     for (int i = 0; i < total_grid_edge_points; i++) {
         int idx_to = lookup_table[i];
         int idx_from;
@@ -356,12 +317,6 @@ int find_max_possible_path_length(const std::vector<PathInfo>& sorted_distances,
     return max_path_length;
 }
 
-// Possible optimisations:
-// - Return early if sum of additional path lengths won't exceed best path that was found (not sure if worth it)
-// - If all inner grid indexes are taken and edge index was just connected, attempt to immediately calculate path length (for c(G), remaining sum would need to be pre-calculated)
-// - If last inner grid index is taken that connect with next expected edge index, attempt to immediately connect it. If can't connect prune this path.
-// - Split paths from middle grid points into other middle grid points and onto edges. This way we won't check indexes that we definitely won't connect with.
-// - Lastly, preferable optimisation would be to somehow check if after each connection, there are no more indexes that will connect with next expected edge index without intersecting (No idea how to though).
 std::vector<int> find_best_solution(const std::vector<PathInfo>& sorted_distances, int size) {
     // algorithm is undefined for these sizes
     if (size <= 1) {
@@ -391,7 +346,7 @@ std::vector<int> find_best_solution(const std::vector<PathInfo>& sorted_distance
     int max_possible_path_length = find_max_possible_path_length(sorted_distances, size);
     std::cout << "Max path length: " << max_possible_path_length << std::endl;
 
-    int best_path_length = 205;
+    int best_path_length = 0;
 
     long long total_found = 0;
 
@@ -570,14 +525,6 @@ std::vector<int> find_best_solution(const std::vector<PathInfo>& sorted_distance
             max_possible_path_length += sorted_distances[last_idx * squared_size].path_length;
         }
     };
-	
-	// temporary
-	//path_indexes.push_back(27);
-	//taken_vertex_map[27] = 1;
- //   max_possible_path_length -= sorted_distances[0 * squared_size].path_length;
-	//find_best(find_best, 27, 25, 1);
-	
-	
 
     find_best(find_best, 0, 0, 1);
 	
@@ -611,7 +558,7 @@ void find_best_grid_hamiltonian_cycle(int size) {
 }
 
 int main() {
-    for (int i = 4; i <= 4; i++) {
+    for (int i = 6; i <= 6; i++) {
         int grid_size = i;
         PiraTimer::start("Grid size: " + std::to_string(i));
         find_best_grid_hamiltonian_cycle(grid_size);

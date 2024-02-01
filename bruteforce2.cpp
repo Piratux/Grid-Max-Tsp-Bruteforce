@@ -3,154 +3,9 @@
 #include <vector>
 #include <numeric>
 
-#include <chrono>
-#include <cstdio>
-#include <map>
-#include <vector>
-#include <queue>
-#include <string>
-#include <iostream>
-#include <iomanip>
-#include <cmath>
-#include <fstream>
-
 using namespace std;
 
-class PiraTimer
-{
-private:
-    class Stats {
-    private:
-        // <total_duration, count>
-        std::pair<double, size_t> averages;
-        // <duration>
-        std::priority_queue<double> medians;
-        double calculated_median = 0.0;
-
-    public:
-        std::chrono::high_resolution_clock::time_point start_time;
-
-    public:
-        void insert_duration(double duration) {
-            averages.first += duration;
-            averages.second += 1;
-
-            medians.push(duration);
-        }
-
-        // NOTE: Modifies existing median data, so can only be calculated once
-        void calculate_median() {
-            // Could happen when start was called, but end wasn't, or it was misspelled
-            if (medians.size() == 0)
-            {
-                calculated_median = 0;
-                return;
-            }
-
-            int64_t count = medians.size() / 2;
-            double last_value = 0;
-            while (count > 0) {
-                last_value = medians.top();
-                medians.pop();
-                --count;
-            }
-
-            if (medians.size() % 2 == 0) {
-                calculated_median = (last_value + medians.top()) / 2;
-            }
-            else {
-                calculated_median = medians.top();
-            }
-        }
-
-        double get_average() {
-            // can happen, when timer was started, but was never ended
-            if (averages.second == 0)
-                return 0;
-
-            return averages.first / (double)averages.second;
-        }
-
-        double get_total() {
-            // can happen, when timer was started, but was never ended
-            if (averages.second == 0)
-                return 0;
-
-            return averages.first;
-        }
-
-        double get_median() {
-            return calculated_median;
-        }
-
-        size_t get_count() {
-            return averages.second;
-        }
-    };
-
-private:
-    // Some settings
-    static const int decimal_precision = 3;
-    static const int spaces_between_words = 3;
-
-    // Some duration stats that are added in end() function
-    static inline std::map<std::string, Stats> stats;
-
-public:
-    static void start(const std::string& description) {
-        stats[description].start_time = std::chrono::high_resolution_clock::now();
-    }
-
-    static std::chrono::duration<double, std::milli> end(const std::string& description) {
-        if (stats.find(description) != stats.end()) {
-            std::chrono::duration<double, std::milli> duration = std::chrono::high_resolution_clock::now() - stats[description].start_time;
-            stats[description].insert_duration(duration.count());
-            return duration;
-        }
-
-        // otherwise description wasn't met in "start()" function yet
-        return std::chrono::duration<double, std::milli>(0);
-    }
-
-    static void print_stats() {
-        std::cout << "-------------------------\n";
-
-        auto get_num_len = [](double num) -> size_t {
-            return num <= 2.0 ? 1 : log10(num) + 1;
-        };
-
-        double total_ms = 0;
-        size_t max_description_length = 0;
-        size_t max_average_length = 0;
-        size_t max_median_length = 0;
-        size_t max_total_length = 0;
-        for (auto it = stats.begin(); it != stats.end(); ++it) {
-            total_ms += it->second.get_average();
-            it->second.calculate_median();
-
-            max_description_length = std::max(max_description_length, it->first.length());
-            max_average_length = std::max(max_average_length, get_num_len(it->second.get_average()));
-            max_median_length = std::max(max_median_length, get_num_len(it->second.get_median()));
-            max_total_length = std::max(max_total_length, get_num_len(it->second.get_total()));
-        }
-
-        std::cout << std::fixed << std::setprecision(decimal_precision);
-        for (auto it = stats.begin(); it != stats.end(); ++it) {
-            std::cout << it->first << std::string(max_description_length - it->first.length() + spaces_between_words, ' ');
-
-            std::cout << "Average: " << it->second.get_average() << " ms" << std::string(max_average_length - get_num_len(it->second.get_average()) + spaces_between_words, ' ');
-            std::cout << "Median: " << it->second.get_median() << " ms" << std::string(max_median_length - get_num_len(it->second.get_median()) + spaces_between_words, ' ');
-            std::cout << "Total: " << it->second.get_total() << " ms" << std::string(max_total_length - get_num_len(it->second.get_total()) + spaces_between_words, ' ');
-            std::cout << "Total measured: " << it->second.get_count() << '\n';
-        }
-
-        std::cout << "-------------------------\n";
-    }
-
-    static void reset_stats() {
-        stats.clear();
-    }
-};
+#include "PiraTimer.h"
 
 // Helper structures and functions
 struct min_or_max_result {
@@ -413,6 +268,7 @@ vector<vector<int>> gen_dist(int size) {
     return grid;
 }
 
+// Broken, as it doesn't produce exact distance matrix as gen_dist above
 // gen_dist.m
 //vector<vector<int>> gen_dist(int n, const vector<vector<int>>& pnum, const vector<vector<int>>& pind) {
 //    int m = n * n;
@@ -484,8 +340,8 @@ vector<vector<int>> gen_dist(int size) {
 //                if (dx != 0 && dy != 0) {
 //                    int x0 = pind[i][0] + 1;
 //                    int y0 = pind[i][1] + 1;
-//                    int kmax = floor((double)abs(x0 - 1) / (double)abs(dx));
-//                    int lmax = floor((double)abs(y0 - 1) / (double)abs(dy));
+//                    int kmax = floor((double)abs(x0 - 1) / (double)(dx));
+//                    int lmax = floor((double)abs(y0 - 1) / (double)(dy));
 //                    int kiek = min(kmax, lmax);
 //                    if (kiek > 1) {
 //                        for (int k = 2; k <= kiek; ++k) {
@@ -495,8 +351,8 @@ vector<vector<int>> gen_dist(int size) {
 //                            A[i][j] = 0;
 //                        }
 //                    }
-//                    kmax = floor((double)abs(x0 - 1) / (double)abs(dx));
-//                    lmax = floor((double)abs(y0 - n) / (double)abs(dy));
+//                    kmax = floor((double)abs(x0 - 1) / (double)(dx));
+//                    lmax = floor((double)abs(y0 - n) / (double)(dy));
 //                    kiek = min(kmax, lmax);
 //                    if (kiek > 1) {
 //                        for (int k = 2; k <= kiek; ++k) {
@@ -506,8 +362,8 @@ vector<vector<int>> gen_dist(int size) {
 //                            A[i][j] = 0;
 //                        }
 //                    }
-//                    kmax = floor((double)abs(x0 - n) / (double)abs(dx));
-//                    lmax = floor((double)abs(y0 - 1) / (double)abs(dy));
+//                    kmax = floor((double)abs(x0 - n) / (double)(dx));
+//                    lmax = floor((double)abs(y0 - 1) / (double)(dy));
 //                    kiek = min(kmax, lmax);
 //                    if (kiek > 1) {
 //                        for (int k = 2; k <= kiek; ++k) {
@@ -517,8 +373,8 @@ vector<vector<int>> gen_dist(int size) {
 //                            A[i][j] = 0;
 //                        }
 //                    }
-//                    kmax = floor((double)abs(x0 - n) / (double)abs(dx));
-//                    lmax = floor((double)abs(y0 - n) / (double)abs(dy));
+//                    kmax = floor((double)abs(x0 - n) / (double)(dx));
+//                    lmax = floor((double)abs(y0 - n) / (double)(dy));
 //                    kiek = min(kmax, lmax);
 //                    if (kiek > 1) {
 //                        for (int k = 2; k <= kiek; ++k) {
@@ -582,6 +438,7 @@ void solveMaxTSP(const int n) {
     }
 
     vector<vector<int>> distances = gen_dist(n); // n^2 x n^2 matrix  // #VALUE
+    //vector<vector<int>> distances = gen_dist(n, pnum, pind); // n^2 x n^2 matrix  // #VALUE
     vector<vector<int>> A = distances; // #VALUE
 
     // Initialization of current paths starting from each vertex k.
@@ -650,50 +507,6 @@ void solveMaxTSP(const int n) {
     vector<int> srow(m, 0);
     vector<int> scol(m, 0);
 
-    auto print_variables_to_file = [&]() {
-        return;
-        if (total_routes > 200) {
-            exit(1);
-            //return;
-        }
-
-        ofstream outfile("output.txt", ios::app); // Open file in append mode, change "output.txt" to your desired file name
-
-        if (!outfile.is_open()) {
-            cerr << "Error opening the file!" << endl;
-            return;
-        }
-
-
-        outfile << endl;
-        outfile << "iterations =" << endl << endl;
-        outfile << "\t" << total_routes << endl << endl;
-
-
-        outfile << endl;
-        outfile << "A =" << endl << endl;
-        for (int i = 0; i < d; ++i) {
-            for (int j = 0; j < d; ++j) {
-                outfile << "\t" << A[i][j];
-            }
-            outfile << endl;
-        }
-        outfile << endl;
-
-
-        outfile << endl;
-        outfile << "edge_order =" << endl << endl;
-        for (int i = 0; i < h; ++i) {
-            for (int j = 0; j < 2; ++j) {
-                outfile << "\t" << edges[i][j] + 1;
-            }
-            outfile << endl;
-        }
-        outfile << endl;
-
-        outfile.close();
-    };
-
     auto calculate_min_and_factor = [&]() {
         for (int i = 0; i < m; ++i) {
             for (int j = 0; j < m; ++j) {
@@ -728,10 +541,6 @@ void solveMaxTSP(const int n) {
         while (factor > 0) {
             calculate_min_and_factor();
 
-            //if (total_routes == 134) {
-            //    printf("");
-            //}
-
             if (factor == 0) {
                 // We found a row or column with all zeros, so current partial
                 // route cannot be prolonged, number of finished partial routes
@@ -740,7 +549,6 @@ void solveMaxTSP(const int n) {
                 // to next iteration of the most inner cycle(instruction "continue").
                 total_routes++;
                 print_variables(total_routes, edges, best_cost, h);
-                print_variables_to_file();
                 continue;
             }
 
@@ -985,7 +793,6 @@ void solveMaxTSP(const int n) {
                 if (factor == 0) {
                     total_routes++;
                     print_variables(total_routes, edges, best_cost, h);
-                    print_variables_to_file();
                     continue;
                 }
 
@@ -996,7 +803,6 @@ void solveMaxTSP(const int n) {
                 if (d == 1 && A[0][0] == 0) {
                     total_routes++;
                     print_variables(total_routes, edges, best_cost, h);
-                    print_variables_to_file();
                     continue;
                 }
 
@@ -1027,7 +833,6 @@ void solveMaxTSP(const int n) {
                 if (dist + S + c0 < best_cost) {
                     total_routes++;
                     print_variables(total_routes, edges, best_cost, h);
-                    print_variables_to_file();
                     continue;
                 }
             }
@@ -1040,7 +845,6 @@ void solveMaxTSP(const int n) {
             if (d == 1 && A[0][0] > 0){
                 total_routes++;
                 print_variables(total_routes, edges, best_cost, h);
-                print_variables_to_file();
 
                 for (int i = 0; i < paths[opposite[1]].size(); i++) {
                     M[i] = paths[opposite[1]][i];
@@ -1080,13 +884,9 @@ void solveMaxTSP(const int n) {
 }
 
 int main() {
-    // Clear contents of output.txt
-    ofstream clearFile("output.txt", ios::trunc);
-    clearFile.close();
-
     PiraTimer::start("bruteforce");
 
-    int n = 5;
+    int n = 4;
     solveMaxTSP(n);
 
     PiraTimer::end("bruteforce");
