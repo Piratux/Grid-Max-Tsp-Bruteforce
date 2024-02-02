@@ -301,6 +301,8 @@ vector<vector<int>> gen_dist(int n, const vector<vector<int>>& pnum, const vecto
 
 // Hamilton4n.m
 void solveMaxTSP(const int n) {
+    PiraTimer::start("bruteforce");
+
     // Initialization to solve maxTSP -- find maximal weight Hamilton cycle
     // Grid nxn with n2 = n ^ 2 vertices, t0 to measure program execution time
     // 
@@ -787,13 +789,11 @@ void solveMaxTSP(const int n) {
             print_final_variables(total_routes, best_cost, cost0, best_route, routes_in_total);
         }
     }
+
+    printf("total %lf ms\n", PiraTimer::end("bruteforce").count());
 }
 
 int main() {
-    PiraTimer::start("bruteforce");
-
     int n = 4;
     solveMaxTSP(n);
-
-    printf("total %lf ms\n", PiraTimer::end("bruteforce").count());
 }

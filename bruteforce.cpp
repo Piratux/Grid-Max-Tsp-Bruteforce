@@ -29,16 +29,6 @@ struct PathInfo
     int idx;
 };
 
-void print_array(vector<int> vec, int add_new_line_every_x = -1) {
-    for (int i = 0; i < vec.size(); i++) {
-        if (add_new_line_every_x != -1 && i % add_new_line_every_x == 0) {
-            printf("\n");
-        }
-        printf("%d ", vec[i]);
-    }
-    printf("\n");
-}
-
 // Source: https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/
 // To find orientation of ordered triplet (p, q, r).
 // The function returns following values
@@ -569,15 +559,15 @@ void find_best_solution(int size, int best_known_cost, const vector<int>& starti
 }
 
 int main() {
-    int n = 6; // Grid size
-    int best_known_cost = 159; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
+    int n = 4; // Grid size
+    int best_known_cost = 0; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
 
     // Vertex indices that will be connected one after another starting from index 1.
     // Paths with other starting vertices won't be checked.
     // Example of valid starting vertices for grid size 5x5: {9, 2, 3}, which will start algorithm with edges {[1, 9], [9, 2], [2, 3]}.
     // Leaving starting vertices as empty {}, will perform a full search.
     // WARNING: it will not work when outter grid points are connected in anti-clockwise manner (4x4 grid invalid example: {5, 9}).
-    vector<int> starting_vertices = {2, 3, 4, 5, 8, 6};
+    vector<int> starting_vertices = {};
 
     find_best_solution(n, best_known_cost, starting_vertices);
 }
