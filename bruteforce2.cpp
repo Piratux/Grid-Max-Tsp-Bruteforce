@@ -3,9 +3,9 @@
 #include <vector>
 #include <numeric>
 
-using namespace std;
-
 #include "PiraTimer.h"
+
+using namespace std;
 
 // Helper structures and functions
 struct min_or_max_result {
@@ -43,21 +43,21 @@ int array_find(const vector<int>& arr, size_t max_elements_to_search_through, in
 }
 
 void print_variables(int total_routes, const vector<vector<int>>& edges, int best_cost, int h) {
-    //if (total_routes % 1 == 0) {
-    //    printf("Iterations: %d\n", total_routes);
+    if (total_routes % 100000 == 0) {
+        printf("Iterations: %d\n", total_routes);
 
-    //    printf("edge_order:\n");
-    //    for (int i = 0; i < h; ++i) {
-    //        for (int j = 0; j < 2; ++j) {
-    //            printf("%d ", edges[i][j] + 1);
-    //        }
-    //        printf("\n");
-    //    }
+        printf("edge_order:\n");
+        for (int i = 0; i < h; ++i) {
+            for (int j = 0; j < 2; ++j) {
+                printf("%d ", edges[i][j] + 1);
+            }
+            printf("\n");
+        }
 
-    //    printf("current_cost: %d\n", best_cost);
-    //    printf("time2 %lf ms\n", PiraTimer::end("bruteforce").count());
-    //    printf("\n");
-    //}
+        printf("current_cost: %d\n", best_cost);
+        printf("time2 %lf ms\n", PiraTimer::end("bruteforce").count());
+        printf("\n");
+    }
 }
 
 void print_variables2(const vector<int>& best_route, const vector<vector<int>>& edges, int best_cost, int h, int total_routes) {
@@ -176,221 +176,128 @@ void simplify_dist(
     }
 }
 
-vector<vector<int>> gen_dist(int size) {
-    int squared_size = size * size;
+// gen_dist.m
+vector<vector<int>> gen_dist(int n, const vector<vector<int>>& pnum, const vector<vector<int>>& pind) {
+    int m = n * n;
+    vector<vector<int>> A(m, vector<int>(m, 0));
 
-    // 0-initialise array
-    vector<vector<int>> grid(squared_size, vector<int>(squared_size, 0));
-
-    int size_m1 = size - 1;
-    int idx_dest = -1;
-
-    int64_t total_path_combinations = 1;
-    vector<int> combination_vector;
-
-    for (int y_from = 0; y_from < size; ++y_from) {
-        for (int x_from = 0; x_from < size; ++x_from) {
-            int paths_from_vertex = 0;
-            for (int y_to = 0; y_to < size; ++y_to) {
-                for (int x_to = 0; x_to < size; ++x_to) {
-                    ++idx_dest;
-
-                    if (x_from == x_to && y_from == y_to) {
-                        continue;
-                    }
-
-                    int vec_x = abs(x_from - x_to);
-                    int vec_y = abs(y_from - y_to);
-
-                    // Remove paths that intersect with other points
-                    if (gcd(vec_x, vec_y) > 1) {
-                        continue;
-                    }
-
-                    // Remove paths that split the grid where no Hamiltonian cycle can be constructed
-                    // Here, {W, N, E, S} indicate grid points that are on the edge of the grid
-                    //     N
-                    //    ---
-                    // W |   | E
-                    //    ---
-                    //     S
-                    if (size > 2) {
-                        // W-E paths
-                        if (vec_x == size_m1) {
-                            continue;
-                        }
-
-                        // N-S paths
-                        if (vec_y == size_m1) {
-                            continue;
-                        }
-
-                        // Only check for connections that don't touch corners
-                        if (vec_x >= 1 && vec_y >= 1) {
-                            // N-W paths
-                            if (x_from == 0 && y_to == 0 ||
-                                y_from == 0 && x_to == 0) {
-                                continue;
-                            }
-
-                            // S-E paths
-                            if (x_from == size_m1 && y_to == size_m1 ||
-                                y_from == size_m1 && x_to == size_m1) {
-                                continue;
-                            }
-
-                            // N-E paths
-                            if (x_from == size_m1 && y_to == 0 ||
-                                y_from == 0 && x_to == size_m1) {
-                                continue;
-                            }
-
-                            // S-W paths
-                            if (x_from == 0 && y_to == size_m1 ||
-                                y_from == size_m1 && x_to == 0) {
-                                continue;
-                            }
-                        }
-                    }
-
-                    paths_from_vertex += 1;
-
-                    int squared_length = vec_x * vec_x + vec_y * vec_y;
-                    grid[idx_dest % squared_size][idx_dest / squared_size] = squared_length;
-                }
-            }
-
-            total_path_combinations *= paths_from_vertex;
-            combination_vector.push_back(paths_from_vertex);
+    // At first we calculate Euclidean distance squares from each vertex of the grid to each vertex.
+    for (int i = 0; i < m; ++i) {
+        for (int j = i + 1; j < m; ++j) {
+            int x1 = pind[i][0];
+            int y1 = pind[i][1];
+            int x2 = pind[j][0];
+            int y2 = pind[j][1];
+            A[i][j] = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+            A[j][i] = A[i][j];
         }
     }
 
-    return grid;
-}
+    // Then we change distance A(i,j)=0 if vertices i and j both belong to
+    // boundaries of the grid
+    for (int i = 0; i < m; ++i) {
+        for (int j = i + 1; j < m; ++j) {
+            int x1 = pind[i][0] + 1;
+            int y1 = pind[i][1] + 1;
+            int x2 = pind[j][0] + 1;
+            int y2 = pind[j][1] + 1;
+            int edge = (x1 == 1) + (x1 == n) + (y1 == 1) + (y1 == n) + (x2 == 1) + (x2 == n) + (y2 == 1) + (y2 == n);
+            if (edge > 1 && !(x1 == y1 && edge == 2) && !(x2 == y2 && edge == 2) && !(x1 + y1 == n + 1 && edge == 2) && !(x2 + y2 == n + 1 && edge == 2)) {
+                A[i][j] = 0;
+                A[j][i] = 0;
+            }
+            if (x1 == x2 && abs(y1 - y2) > 1) {
+                A[i][j] = 0;
+                A[j][i] = 0;
+            }
+            if (y1 == y2 && abs(x1 - x2) > 1) {
+                A[i][j] = 0;
+                A[j][i] = 0;
+            }
+        }
+    }
 
-// Broken, as it doesn't produce exact distance matrix as gen_dist above
-// gen_dist.m
-//vector<vector<int>> gen_dist(int n, const vector<vector<int>>& pnum, const vector<vector<int>>& pind) {
-//    int m = n * n;
-//    vector<vector<int>> A(m, vector<int>(m, 0));
-//
-//    // At first we calculate Euclidean distance squares from each vertex of the grid to each vertex.
-//    for (int i = 0; i < m; ++i) {
-//        for (int j = i + 1; j < m; ++j) {
-//            int x1 = pind[i][0];
-//            int y1 = pind[i][1];
-//            int x2 = pind[j][0];
-//            int y2 = pind[j][1];
-//            A[i][j] = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
-//            A[j][i] = A[i][j];
-//        }
-//    }
-//
-//    // Then we change distance A(i,j)=0 if vertices i and j both belong to
-//    // boundaries of the grid
-//    for (int i = 0; i < m; ++i) {
-//        for (int j = i + 1; j < m; ++j) {
-//            int x1 = pind[i][0];
-//            int y1 = pind[i][1];
-//            int x2 = pind[j][0];
-//            int y2 = pind[j][1];
-//            int edge = (x1 == 1) + (x1 == n) + (y1 == 1) + (y1 == n) + (x2 == 1) + (x2 == n) + (y2 == 1) + (y2 == n);
-//            if (edge > 1 && !(x1 == y1 && edge == 2) && !(x2 == y2 && edge == 2) && !(x1 + y1 == n + 1 && edge == 2) && !(x2 + y2 == n + 1 && edge == 2)) {
-//                A[i][j] = 0;
-//                A[j][i] = 0;
-//            }
-//            if (x1 == x2 && abs(y1 - y2) > 1) {
-//                A[i][j] = 0;
-//                A[j][i] = 0;
-//            }
-//            if (y1 == y2 && abs(x1 - x2) > 1) {
-//                A[i][j] = 0;
-//                A[j][i] = 0;
-//            }
-//        }
-//    }
-//
-//    // Now we have to restore the distances for some pairs of vertices that
-//    // belong to the same boundary
-//    for (int i = 0; i < m; ++i) {
-//        for (int dx = -1; dx <= 1; dx += 2) {
-//            int x = pind[i][0] + dx;
-//            int y = pind[i][1];
-//            if (0 <= x && x < n) {
-//                int j = pnum[x][y];
-//                A[i][j] = 1;
-//            }
-//        }
-//        for (int dy = -1; dy <= 1; dy += 2) {
-//            int y = pind[i][1] + dy;
-//            int x = pind[i][0];
-//            if (0 <= y && y < n) {
-//                int j = pnum[x][y];
-//                A[i][j] = 1;
-//            }
-//        }
-//    }
-//
-//    // Finally, we consider all diagonals as well as horizontals and verticals
-//    // and change distance to zero if two vertices are not seen from each other in the grid
-//    // (straight line connecting them crosses other vertices).
-//    for (int dx = -(n - 2); dx <= (n - 2); ++dx) {
-//        for (int dy = -(n - 2); dy <= (n - 2); ++dy) {
-//            for (int i = 0; i < m; ++i) {
-//                if (dx != 0 && dy != 0) {
-//                    int x0 = pind[i][0] + 1;
-//                    int y0 = pind[i][1] + 1;
-//                    int kmax = floor((double)abs(x0 - 1) / (double)(dx));
-//                    int lmax = floor((double)abs(y0 - 1) / (double)(dy));
-//                    int kiek = min(kmax, lmax);
-//                    if (kiek > 1) {
-//                        for (int k = 2; k <= kiek; ++k) {
-//                            int x = x0 - k * dx;
-//                            int y = y0 - k * dy;
-//                            int j = pnum[x - 1][y - 1];
-//                            A[i][j] = 0;
-//                        }
-//                    }
-//                    kmax = floor((double)abs(x0 - 1) / (double)(dx));
-//                    lmax = floor((double)abs(y0 - n) / (double)(dy));
-//                    kiek = min(kmax, lmax);
-//                    if (kiek > 1) {
-//                        for (int k = 2; k <= kiek; ++k) {
-//                            int x = x0 - k * dx;
-//                            int y = y0 + k * dy;
-//                            int j = pnum[x - 1][y - 1];
-//                            A[i][j] = 0;
-//                        }
-//                    }
-//                    kmax = floor((double)abs(x0 - n) / (double)(dx));
-//                    lmax = floor((double)abs(y0 - 1) / (double)(dy));
-//                    kiek = min(kmax, lmax);
-//                    if (kiek > 1) {
-//                        for (int k = 2; k <= kiek; ++k) {
-//                            int x = x0 + k * dx;
-//                            int y = y0 - k * dy;
-//                            int j = pnum[x - 1][y - 1];
-//                            A[i][j] = 0;
-//                        }
-//                    }
-//                    kmax = floor((double)abs(x0 - n) / (double)(dx));
-//                    lmax = floor((double)abs(y0 - n) / (double)(dy));
-//                    kiek = min(kmax, lmax);
-//                    if (kiek > 1) {
-//                        for (int k = 2; k <= kiek; ++k) {
-//                            int x = x0 + k * dx;
-//                            int y = y0 + k * dy;
-//                            int j = pnum[x - 1][y - 1];
-//                            A[i][j] = 0;
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//    }
-//
-//    return A;
-//}
+    // Now we have to restore the distances for some pairs of vertices that
+    // belong to the same boundary
+    for (int i = 0; i < m; ++i) {
+        for (int dx = -1; dx <= 1; dx += 2) {
+            int x = pind[i][0] + dx + 1;
+            int y = pind[i][1] + 1;
+            if (1 <= x && x <= n) {
+                int j = pnum[x - 1][y - 1];
+                A[i][j] = 1;
+            }
+        }
+        for (int dy = -1; dy <= 1; dy += 2) {
+            int y = pind[i][1] + dy + 1;
+            int x = pind[i][0] + 1;
+            if (1 <= y && y <= n) {
+                int j = pnum[x - 1][y - 1];
+                A[i][j] = 1;
+            }
+        }
+    }
+
+    // Finally, we consider all diagonals as well as horizontals and verticals
+    // and change distance to zero if two vertices are not seen from each other in the grid
+    // (straight line connecting them crosses other vertices).
+    for (int dx = -(n - 2); dx <= (n - 2); ++dx) {
+        for (int dy = -(n - 2); dy <= (n - 2); ++dy) {
+            for (int i = 0; i < m; ++i) {
+                if (dx != 0 && dy != 0) {
+                    int x0 = pind[i][0] + 1;
+                    int y0 = pind[i][1] + 1;
+                    int kmax = floor((double)abs(x0 - 1) / (double)(dx));
+                    int lmax = floor((double)abs(y0 - 1) / (double)(dy));
+                    int kiek = min(kmax, lmax);
+                    if (kiek > 1) {
+                        for (int k = 2; k <= kiek; ++k) {
+                            int x = x0 - k * dx;
+                            int y = y0 - k * dy;
+                            int j = pnum[x - 1][y - 1];
+                            A[i][j] = 0;
+                        }
+                    }
+                    kmax = floor((double)abs(x0 - 1) / (double)(dx));
+                    lmax = floor((double)abs(y0 - n) / (double)(dy));
+                    kiek = min(kmax, lmax);
+                    if (kiek > 1) {
+                        for (int k = 2; k <= kiek; ++k) {
+                            int x = x0 - k * dx;
+                            int y = y0 + k * dy;
+                            int j = pnum[x - 1][y - 1];
+                            A[i][j] = 0;
+                        }
+                    }
+                    kmax = floor((double)abs(x0 - n) / (double)(dx));
+                    lmax = floor((double)abs(y0 - 1) / (double)(dy));
+                    kiek = min(kmax, lmax);
+                    if (kiek > 1) {
+                        for (int k = 2; k <= kiek; ++k) {
+                            int x = x0 + k * dx;
+                            int y = y0 - k * dy;
+                            int j = pnum[x - 1][y - 1];
+                            A[i][j] = 0;
+                        }
+                    }
+                    kmax = floor((double)abs(x0 - n) / (double)(dx));
+                    lmax = floor((double)abs(y0 - n) / (double)(dy));
+                    kiek = min(kmax, lmax);
+                    if (kiek > 1) {
+                        for (int k = 2; k <= kiek; ++k) {
+                            int x = x0 + k * dx;
+                            int y = y0 + k * dy;
+                            int j = pnum[x - 1][y - 1];
+                            A[i][j] = 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return A;
+}
 
 // Hamilton4n.m
 void solveMaxTSP(const int n) {
@@ -437,8 +344,7 @@ void solveMaxTSP(const int n) {
         }
     }
 
-    vector<vector<int>> distances = gen_dist(n); // n^2 x n^2 matrix  // #VALUE
-    //vector<vector<int>> distances = gen_dist(n, pnum, pind); // n^2 x n^2 matrix  // #VALUE
+    vector<vector<int>> distances = gen_dist(n, pnum, pind); // n^2 x n^2 matrix  // #VALUE
     vector<vector<int>> A = distances; // #VALUE
 
     // Initialization of current paths starting from each vertex k.
@@ -889,6 +795,5 @@ int main() {
     int n = 4;
     solveMaxTSP(n);
 
-    PiraTimer::end("bruteforce");
-    PiraTimer::print_stats();
+    printf("total %lf ms\n", PiraTimer::end("bruteforce").count());
 }
