@@ -30,11 +30,11 @@ struct PathInfo
 void print_array(std::vector<int> vec, int add_new_line_every_x = -1) {
     for (int i = 0; i < vec.size(); i++) {
         if (add_new_line_every_x != -1 && i % add_new_line_every_x == 0) {
-            std::cout << std::endl;
+            printf("\n");
         }
-        std::cout << vec[i] << ' ';
+        printf("%d ", vec[i]);
     }
-    std::cout << std::endl;
+    printf("\n");
 }
 
 // Source: https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/
@@ -294,17 +294,22 @@ std::vector<PathInfo> sort_path_distances(const std::vector<PathInfo>& distances
     return path_distances;
 }
 
-void print_coordinate_array(const std::vector<int>& solution, int size) {
-    std::cout << "[";
-    for (int i = 1; i < solution.size(); i++) {
-        Point p1 = make_2D_index(solution[i], size);
-        Point p2 = make_2D_index(solution[i - 1], size);
+void print_best_variables(const std::vector<int>& path_indexes, int best_cost) {
+    printf("path_indexes:\n");
+    for (int i = 0; i < path_indexes.size(); ++i) {
+        printf("%d ", path_indexes[i] + 1);
+    }
+    printf("\n");
 
-        std::cout << "[" << p1.x << ", " << p1.y << ", " << p2.x << ", " << p2.y << "], ";
+    printf("path edges:\n");
+    for (int i = 1; i < path_indexes.size(); ++i) {
+        printf("%d %d\n", path_indexes[i - 1] + 1, path_indexes[i] + 1);
     }
 
-    std::cout << "]";
-    std::cout << std::endl;
+    printf("best_cost: %d\n", best_cost);
+
+    printf("time %lf ms\n", PiraTimer::end("bruteforce").count());
+    printf("\n");
 }
 
 int find_max_possible_path_length(const std::vector<PathInfo>& sorted_distances, int size) {
@@ -317,10 +322,10 @@ int find_max_possible_path_length(const std::vector<PathInfo>& sorted_distances,
     return max_path_length;
 }
 
-std::vector<int> find_best_solution(const std::vector<PathInfo>& sorted_distances, int size) {
+void find_best_solution(const std::vector<PathInfo>& sorted_distances, int size, int best_known_cost) {
     // algorithm is undefined for these sizes
     if (size <= 1) {
-        return {};
+        return;
     }
 
     int squared_size = size * size;
@@ -344,14 +349,10 @@ std::vector<int> find_best_solution(const std::vector<PathInfo>& sorted_distance
     std::vector<int> reverse_edge_lookup_table = create_reverse_lookup_table(size);
 
     int max_possible_path_length = find_max_possible_path_length(sorted_distances, size);
-    std::cout << "Max path length: " << max_possible_path_length << std::endl;
 
-    int best_path_length = 0;
+    int best_path_length = best_known_cost;
 
     long long total_found = 0;
-
-    int temp_id = 0;
-    PiraTimer::start("find_best_solution" + std::to_string(temp_id));
 
     auto check_if_new_vertex_creates_intersections = [&](int new_idx, bool add_last_path) -> bool {
         // Check if there are any intersections with new path with all other ones
@@ -421,17 +422,8 @@ std::vector<int> find_best_solution(const std::vector<PathInfo>& sorted_distance
             if (path_length > best_path_length) {
                 best_path_length = path_length;
                 best_path_indexes = path_indexes;
-				
-                PiraTimer::end("find_best_solution" + std::to_string(temp_id));
-                PiraTimer::print_stats();
-				
-				std::cout << "Total paths checked: " << total_found << std::endl;
-				std::cout << "Best path length: " << best_path_length << std::endl;
-				std::cout << "Best path length solution connections pairs: ";
-				print_coordinate_array(path_indexes, size);
 
-                temp_id++;
-                PiraTimer::start("find_best_solution" + std::to_string(temp_id));
+                print_best_variables(path_indexes, best_path_length);
             }
 			
             return;
@@ -506,9 +498,7 @@ std::vector<int> find_best_solution(const std::vector<PathInfo>& sorted_distance
                 }
             }
 
-            //PiraTimer::start("check_if_new_vertex_creates_intersections. Grid size: " + std::to_string(size));
             bool result = check_if_new_vertex_creates_intersections(new_idx, add_last_path);
-            //PiraTimer::end("check_if_new_vertex_creates_intersections. Grid size: " + std::to_string(size));
 
             if (result == true) {
                 continue;
@@ -528,42 +518,28 @@ std::vector<int> find_best_solution(const std::vector<PathInfo>& sorted_distance
 
     find_best(find_best, 0, 0, 1);
 	
-	std::cout << "Total paths checked: " << total_found << std::endl;
-
-    std::cout << "Best path length: " << best_path_length << std::endl;
-
-    std::cout << "Best path length solution connections pairs: ";
-    print_coordinate_array(best_path_indexes, size);
-
-    std::cout << "Best path solution indexes: ";
-    print_array(best_path_indexes);
-
-    return best_path_indexes;
+    printf("All paths checked.\n");
 }
 
-void find_best_grid_hamiltonian_cycle(int size) {
+void find_best_grid_hamiltonian_cycle(int size, int best_known_cost) {
     auto grid = make_adjacency_matrix(size);
     auto distances = make_path_distances(grid, size);
     auto pruned_distances = prune_anti_clockwise_paths(distances, size);
     auto sorted_distances = sort_path_distances(pruned_distances, size);
 
-    std::cout << "Finding best solution for " << size << "x" << size << " grid..." << std::endl;
+    printf("Searching best solution for %dx%d grid.\n", size, size);
+    printf("best_known_cost = %d.\n", best_known_cost);
+    printf("\n");
 
-    auto solution = find_best_solution(sorted_distances, size);
-
-    std::cout << "All solutions checked" << std::endl;
-
-    std::cout << std::endl;
-    std::cout << std::endl;
+    find_best_solution(sorted_distances, size, best_known_cost);
 }
 
 int main() {
-    for (int i = 6; i <= 6; i++) {
-        int grid_size = i;
-        PiraTimer::start("Grid size: " + std::to_string(i));
-        find_best_grid_hamiltonian_cycle(grid_size);
-        PiraTimer::end("Grid size: " + std::to_string(i));
-    }
+    PiraTimer::start("bruteforce");
 
-    PiraTimer::print_stats();
+    int n = 5; // Grid size
+    int best_known_cost = 0; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
+    find_best_grid_hamiltonian_cycle(n, best_known_cost);
+
+    printf("total %lf ms\n", PiraTimer::end("bruteforce").count());
 }

@@ -60,7 +60,7 @@ void print_variables(int total_routes, const vector<vector<int>>& edges, int bes
     }
 }
 
-void print_variables2(const vector<int>& best_route, const vector<vector<int>>& edges, int best_cost, int h, int total_routes) {
+void print_best_variables(const vector<int>& best_route, const vector<vector<int>>& edges, int best_cost, int h, int total_routes) {
     printf("best_route:\n");
     for (int i = 0; i < best_route.size(); ++i) {
         printf("%d ", best_route[i] + 1);
@@ -762,7 +762,7 @@ void solveMaxTSP(const int n) {
                     }
                     best_cost = dist;
                     routes_in_total = total_routes;
-                    print_variables2(best_route, edges, best_cost, h, total_routes);
+                    print_best_variables(best_route, edges, best_cost, h, total_routes);
                 }
             }
         }
