@@ -12,6 +12,8 @@
 
 #include "PiraTimer.h"
 
+using namespace std;
+
 struct Point
 {
     int x;
@@ -27,7 +29,7 @@ struct PathInfo
     int idx;
 };
 
-void print_array(std::vector<int> vec, int add_new_line_every_x = -1) {
+void print_array(vector<int> vec, int add_new_line_every_x = -1) {
     for (int i = 0; i < vec.size(); i++) {
         if (add_new_line_every_x != -1 && i % add_new_line_every_x == 0) {
             printf("\n");
@@ -78,17 +80,17 @@ Point make_2D_index(int idx, int width) {
     return p;
 }
 
-std::vector<int> make_adjacency_matrix(int size) {
+vector<int> make_adjacency_matrix(int size) {
     int squared_size = size * size;
 
     // 0-initialise array
-    std::vector<int> grid(squared_size * squared_size, 0);
+    vector<int> grid(squared_size * squared_size, 0);
 
     int size_m1 = size - 1;
     int idx_dest = -1;
 
     int64_t total_path_combinations = 1;
-    std::vector<int> combination_vector;
+    vector<int> combination_vector;
 
     for (int y_from = 0; y_from < size; ++y_from) {
         for (int x_from = 0; x_from < size; ++x_from) {
@@ -101,11 +103,11 @@ std::vector<int> make_adjacency_matrix(int size) {
                         continue;
                     }
 
-                    int vec_x = std::abs(x_from - x_to);
-                    int vec_y = std::abs(y_from - y_to);
+                    int vec_x = abs(x_from - x_to);
+                    int vec_y = abs(y_from - y_to);
 
                     // Remove paths that intersect with other points
-                    if (std::gcd(vec_x, vec_y) > 1) {
+                    if (gcd(vec_x, vec_y) > 1) {
                         continue;
                     }
 
@@ -170,9 +172,9 @@ std::vector<int> make_adjacency_matrix(int size) {
     return grid;
 }
 
-std::vector<int> create_lookup_table(int size) {
+vector<int> create_lookup_table(int size) {
     int squared_size = size * size;
-    std::vector<int> edge_lookup_table;
+    vector<int> edge_lookup_table;
     edge_lookup_table.resize(squared_size);
 
     int size_m1 = size - 1;
@@ -218,9 +220,9 @@ std::vector<int> create_lookup_table(int size) {
     return edge_lookup_table;
 }
 
-std::vector<int> create_reverse_lookup_table(int size) {
-    std::vector<int> lookup_table = create_lookup_table(size);
-    std::vector<int> reverse_edge_lookup_table;
+vector<int> create_reverse_lookup_table(int size) {
+    vector<int> lookup_table = create_lookup_table(size);
+    vector<int> reverse_edge_lookup_table;
     reverse_edge_lookup_table.resize(lookup_table.size());
 
     for (int i = 0; i < lookup_table.size(); i++) {
@@ -232,10 +234,10 @@ std::vector<int> create_reverse_lookup_table(int size) {
 }
 
 // 2D array of sorted connections
-std::vector<PathInfo> make_path_distances(const std::vector<int>& grid, int size) {
+vector<PathInfo> make_path_distances(const vector<int>& grid, int size) {
     int squared_size = size * size;
 
-    std::vector<PathInfo> path_distances;
+    vector<PathInfo> path_distances;
     path_distances.resize(squared_size * squared_size);
 
     for (int i = 0; i < squared_size; i++) {
@@ -251,12 +253,12 @@ std::vector<PathInfo> make_path_distances(const std::vector<int>& grid, int size
 }
 
 // Since we won't consider paths where outter grid points are visited anti-clockwise, we can just remove them
-std::vector<PathInfo> prune_anti_clockwise_paths(const std::vector<PathInfo>& distances, int size) {
+vector<PathInfo> prune_anti_clockwise_paths(const vector<PathInfo>& distances, int size) {
     int squared_size = size * size;
     int total_grid_edge_points = 4 * (size - 1);
 
-    std::vector<PathInfo> path_distances = distances;
-    std::vector<int> lookup_table = create_reverse_lookup_table(size);
+    vector<PathInfo> path_distances = distances;
+    vector<int> lookup_table = create_reverse_lookup_table(size);
 
     for (int i = 0; i < total_grid_edge_points; i++) {
         int idx_to = lookup_table[i];
@@ -275,14 +277,14 @@ std::vector<PathInfo> prune_anti_clockwise_paths(const std::vector<PathInfo>& di
     return path_distances;
 }
 
-std::vector<PathInfo> sort_path_distances(const std::vector<PathInfo>& distances, int size) {
+vector<PathInfo> sort_path_distances(const vector<PathInfo>& distances, int size) {
     int squared_size = size * size;
 
-    std::vector<PathInfo> path_distances = distances;
+    vector<PathInfo> path_distances = distances;
 
     for (int i = 0; i < squared_size; i++) {
         // We sort the distances, so that we can iterate over available paths consecutively instead of jumping over empty indexes
-        std::sort(
+        sort(
             path_distances.begin() + i * squared_size,
             path_distances.begin() + (i + 1) * squared_size,
             [](PathInfo left, PathInfo right) {
@@ -294,7 +296,7 @@ std::vector<PathInfo> sort_path_distances(const std::vector<PathInfo>& distances
     return path_distances;
 }
 
-void print_best_variables(const std::vector<int>& path_indexes, int best_cost) {
+void print_best_variables(const vector<int>& path_indexes, int best_cost) {
     printf("path_indexes:\n");
     for (int i = 0; i < path_indexes.size(); ++i) {
         printf("%d ", path_indexes[i] + 1);
@@ -312,7 +314,7 @@ void print_best_variables(const std::vector<int>& path_indexes, int best_cost) {
     printf("\n");
 }
 
-int find_max_possible_path_length(const std::vector<PathInfo>& sorted_distances, int size) {
+int find_max_possible_path_length(const vector<PathInfo>& sorted_distances, int size) {
     int squared_size = size * size;
     int max_path_length = 0;
     for (int i = 0; i < squared_size; i++) {
@@ -322,21 +324,37 @@ int find_max_possible_path_length(const std::vector<PathInfo>& sorted_distances,
     return max_path_length;
 }
 
-void find_best_solution(const std::vector<PathInfo>& sorted_distances, int size, int best_known_cost) {
+void find_best_solution(int size, int best_known_cost, const vector<int>& starting_vertices) {
     // algorithm is undefined for these sizes
     if (size <= 1) {
+        printf("size = %d is invalid.\n", size);
         return;
     }
+
+    PiraTimer::start("bruteforce");
+
+    printf("Searching best solution for %dx%d grid.\n", size, size);
+    printf("best_known_cost = %d.\n", best_known_cost);
+    printf("starting_vertices =\n");
+    for (int i = 0; i < starting_vertices.size(); i++) {
+        printf("%d\n", starting_vertices[i]);
+    }
+    printf("\n");
+
+    vector<int> grid = make_adjacency_matrix(size);
+    vector<PathInfo> distances = make_path_distances(grid, size);
+    vector<PathInfo> pruned_distances = prune_anti_clockwise_paths(distances, size);
+    vector<PathInfo> sorted_distances = sort_path_distances(pruned_distances, size);
 
     int squared_size = size * size;
     int total_outter_points = (size - 1) * 4;
     
     // 0 = free
     // 1 = taken
-    std::vector<int> taken_vertex_map(squared_size, 0);
+    vector<int> taken_vertex_map(squared_size, 0);
 
-    std::vector<int> best_path_indexes;
-    std::vector<int> path_indexes;
+    vector<int> best_path_indexes;
+    vector<int> path_indexes;
     best_path_indexes.reserve(squared_size + 1);
     path_indexes.reserve(squared_size + 1);
 
@@ -345,8 +363,8 @@ void find_best_solution(const std::vector<PathInfo>& sorted_distances, int size,
     path_indexes.push_back(0);
 
     // Create lookup table to quickly check if vertex index is on the edge of the grid
-    std::vector<int> edge_lookup_table = create_lookup_table(size);
-    std::vector<int> reverse_edge_lookup_table = create_reverse_lookup_table(size);
+    vector<int> edge_lookup_table = create_lookup_table(size);
+    vector<int> reverse_edge_lookup_table = create_reverse_lookup_table(size);
 
     int max_possible_path_length = find_max_possible_path_length(sorted_distances, size);
 
@@ -354,7 +372,7 @@ void find_best_solution(const std::vector<PathInfo>& sorted_distances, int size,
 
     long long total_found = 0;
 
-    auto check_if_new_vertex_creates_intersections = [&](int new_idx, bool add_last_path) -> bool {
+    auto check_if_new_vertex_creates_intersections = [&](int new_idx, bool add_last_path) {
         // Check if there are any intersections with new path with all other ones
         Point p1 = make_2D_index(new_idx, size);
         Point p2 = make_2D_index(path_indexes.back(), size);
@@ -516,30 +534,50 @@ void find_best_solution(const std::vector<PathInfo>& sorted_distances, int size,
         }
     };
 
-    find_best(find_best, 0, 0, 1);
+    // Handle starting vertices
+    int last_inserted_vertex_idx = 0;
+    int path_length = 0;
+    int outter_grid_points = 1;
+    for (int i = 0; i < starting_vertices.size(); i++) {
+        int new_vertex_idx = starting_vertices[i] - 1;
+        int edge_length = pruned_distances[last_inserted_vertex_idx * squared_size + new_vertex_idx].path_length;
+
+        if (edge_length == 0) {
+            printf("Invalid edge connection provided in starting_vertices going from %d to %d\n", last_inserted_vertex_idx + 1, starting_vertices[i]);
+            return;
+        }
+
+        path_length += edge_length;
+        max_possible_path_length -= sorted_distances[last_inserted_vertex_idx * squared_size].path_length;
+
+        last_inserted_vertex_idx = new_vertex_idx;
+        path_indexes.push_back(last_inserted_vertex_idx);
+        taken_vertex_map[last_inserted_vertex_idx] = 1;
+
+        int transformed_idx = edge_lookup_table[new_vertex_idx];
+        if (transformed_idx < total_outter_points) {
+            outter_grid_points++;
+        }
+    }
+
+    // Finally, start the bruteforce algorithm
+    find_best(find_best, last_inserted_vertex_idx, path_length, outter_grid_points);
 	
     printf("All paths checked.\n");
-}
 
-void find_best_grid_hamiltonian_cycle(int size, int best_known_cost) {
-    auto grid = make_adjacency_matrix(size);
-    auto distances = make_path_distances(grid, size);
-    auto pruned_distances = prune_anti_clockwise_paths(distances, size);
-    auto sorted_distances = sort_path_distances(pruned_distances, size);
-
-    printf("Searching best solution for %dx%d grid.\n", size, size);
-    printf("best_known_cost = %d.\n", best_known_cost);
-    printf("\n");
-
-    find_best_solution(sorted_distances, size, best_known_cost);
+    printf("total %lf ms\n", PiraTimer::end("bruteforce").count());
 }
 
 int main() {
-    PiraTimer::start("bruteforce");
+    int n = 6; // Grid size
+    int best_known_cost = 159; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
 
-    int n = 5; // Grid size
-    int best_known_cost = 0; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
-    find_best_grid_hamiltonian_cycle(n, best_known_cost);
+    // Vertex indices that will be connected one after another starting from index 1.
+    // Paths with other starting vertices won't be checked.
+    // Example of valid starting vertices for grid size 5x5: {9, 2, 3}, which will start algorithm with edges {[1, 9], [9, 2], [2, 3]}.
+    // Leaving starting vertices as empty {}, will perform a full search.
+    // WARNING: it will not work when outter grid points are connected in anti-clockwise manner (4x4 grid invalid example: {5, 9}).
+    vector<int> starting_vertices = {2, 3, 4, 5, 8, 6};
 
-    printf("total %lf ms\n", PiraTimer::end("bruteforce").count());
+    find_best_solution(n, best_known_cost, starting_vertices);
 }
