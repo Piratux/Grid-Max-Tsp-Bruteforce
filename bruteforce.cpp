@@ -168,43 +168,44 @@ vector<int> create_lookup_table(int size) {
     edge_lookup_table.resize(squared_size);
 
     int size_m1 = size - 1;
+    int idx_to = 0;
 
     // Create reordered index lookup map
-    // Top
+    // Left
     for (int i = 0; i < size_m1; i++) {
-        int idx_from = i;
-        int idx_to = i;
+        int idx_from = i * size;
         edge_lookup_table[idx_from] = idx_to;
-    }
-
-    // Right
-    for (int i = 0; i < size_m1; i++) {
-        int idx_from = size_m1 + i * size;
-        int idx_to = i + size_m1;
-        edge_lookup_table[idx_from] = idx_to;
+        idx_to++;
     }
 
     // Bottom
     for (int i = 0; i < size_m1; i++) {
-        int idx_from = squared_size - 1 - i;
-        int idx_to = i + 2 * size_m1;
+        int idx_from = squared_size - size_m1 + i - 1;
         edge_lookup_table[idx_from] = idx_to;
+        idx_to++;
     }
 
-    // Left
+    // Right
     for (int i = 0; i < size_m1; i++) {
-        int idx_from = squared_size - (i + 1) * size;
-        int idx_to = i + 3 * size_m1;
+        int idx_from = squared_size - 1 - i * size;
         edge_lookup_table[idx_from] = idx_to;
+        idx_to++;
+    }
+
+    // Top
+    for (int i = 0; i < size_m1; i++) {
+        int idx_from = size_m1 - i;
+        edge_lookup_table[idx_from] = idx_to;
+        idx_to++;
     }
 
     // Remaining indices in the middle
     for (int i = 4 * size_m1; i < squared_size; i++) {
-        int idx_to = i;
         int idx_offset = i - 4 * size_m1;
         Point idx_2d = make_2D_index(idx_offset, size - 2);
         int idx_from = make_1D_index(idx_2d.x + 1, idx_2d.y + 1, size);
         edge_lookup_table[idx_from] = idx_to;
+        idx_to++;
     }
 
     return edge_lookup_table;
@@ -242,8 +243,8 @@ vector<PathInfo> make_path_distances(const vector<int>& grid, int size) {
     return path_distances;
 }
 
-// Since we won't consider paths where outter grid points are visited anti-clockwise, we can just remove them
-vector<PathInfo> prune_anti_clockwise_paths(const vector<PathInfo>& distances, int size) {
+// Since we won't consider paths where outter grid points are visited clockwise, we can just remove them
+vector<PathInfo> prune_clockwise_paths(const vector<PathInfo>& distances, int size) {
     int squared_size = size * size;
     int total_grid_edge_points = 4 * (size - 1);
 
@@ -262,6 +263,18 @@ vector<PathInfo> prune_anti_clockwise_paths(const vector<PathInfo>& distances, i
 
         int idx_to_prune = make_1D_index(idx_to, idx_from, squared_size);
         path_distances[idx_to_prune].path_length = 0;
+    }
+
+    return path_distances;
+}
+
+vector<PathInfo> prune_symmetric_paths(const vector<PathInfo>& distances, int size) {
+    vector<PathInfo> path_distances = distances;
+    for (int y = 0; y < size; y++) {
+        for (int x = y + 1; x < size; x++) {
+            int idx_to_prune = make_1D_index(x, y, size);
+            path_distances[idx_to_prune].path_length = 0;
+        }
     }
 
     return path_distances;
@@ -333,8 +346,9 @@ void find_best_solution(int size, int best_known_cost, const vector<int>& starti
 
     vector<int> grid = make_adjacency_matrix(size);
     vector<PathInfo> distances = make_path_distances(grid, size);
-    vector<PathInfo> pruned_distances = prune_anti_clockwise_paths(distances, size);
-    vector<PathInfo> sorted_distances = sort_path_distances(pruned_distances, size);
+    vector<PathInfo> pruned_clockwise_distances = prune_clockwise_paths(distances, size);
+    vector<PathInfo> pruned_symmetric_distances = prune_symmetric_paths(pruned_clockwise_distances, size);
+    vector<PathInfo> sorted_distances = sort_path_distances(pruned_symmetric_distances, size);
 
     int squared_size = size * size;
     int total_outter_points = (size - 1) * 4;
@@ -535,7 +549,7 @@ void find_best_solution(int size, int best_known_cost, const vector<int>& starti
     int outter_grid_points = 1;
     for (int i = 0; i < starting_vertices.size(); i++) {
         int new_vertex_idx = starting_vertices[i] - 1;
-        int edge_length = pruned_distances[last_inserted_vertex_idx * squared_size + new_vertex_idx].path_length;
+        int edge_length = pruned_symmetric_distances[last_inserted_vertex_idx * squared_size + new_vertex_idx].path_length;
 
         if (edge_length == 0) {
             printf("Invalid edge connection provided in starting_vertices going from %d to %d\n", last_inserted_vertex_idx + 1, starting_vertices[i]);
@@ -564,7 +578,7 @@ void find_best_solution(int size, int best_known_cost, const vector<int>& starti
 }
 
 int main() {
-    int n = 6; // Grid size
+    int n = 5; // Grid size
     int best_known_cost = 0; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
 
     // Vertex indices that will be connected one after another starting from index 1.
@@ -572,7 +586,7 @@ int main() {
     // Example of valid starting vertices for grid size 5x5: {9, 2, 3}, which will start algorithm with edges {[1, 9], [9, 2], [2, 3]}.
     // Leaving starting vertices as empty {}, will perform a full search.
     // WARNING: it will not work when outter grid points are connected in anti-clockwise manner (4x4 grid invalid example: {5, 9}).
-    vector<int> starting_vertices = { 28, 11 };
+    vector<int> starting_vertices = { };
 
     find_best_solution(n, best_known_cost, starting_vertices);
 }

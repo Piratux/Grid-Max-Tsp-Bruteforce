@@ -144,7 +144,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="bruteforce.cpp" />
-    <ClCompile Include="bruteforce2.cpp" />
+    <ClCompile Include="bruteforce-matlab.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PiraTimer.h" />
