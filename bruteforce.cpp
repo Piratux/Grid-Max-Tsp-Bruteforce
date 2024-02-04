@@ -5,7 +5,7 @@
 // Code made for finding best Hamiltonian cycle to satisfy maximise d(G) function.
 // Functions and problem described here: https://piratux.github.io/connect_points/
 
-#include <iostream>
+#include <cstdio>
 #include <vector>
 #include <numeric>
 #include <algorithm>
@@ -388,7 +388,12 @@ void find_best_solution(int size, int best_known_cost, const vector<int>& starti
     auto point_is_reachable = [&](int idx_to_check, int last_outter_grid_idx, int next_outter_grid_idx) {
         bool reachable = true;
 
-        Point point_outside_grid = { -1, -1 };
+        // It's very important that when creating segment from this point to inner grid
+        // point, there are no vertices that intersect with this segment, because "segments_intersect()"
+        // only returns true when segments do not share starting/ending points.
+        // Large prime number should make sure starting/ending points are never shared.
+        Point point_outside_grid = { -1, -1009 }; // This should not cause issues for grids smaller than 1000x1000.
+
         Point current_point = make_2D_index(idx_to_check, size);
         Point p3;
         Point p4;
@@ -431,7 +436,7 @@ void find_best_solution(int size, int best_known_cost, const vector<int>& starti
                 best_path_length = path_length;
                 best_path_indexes = path_indexes;
 
-                print_best_variables(path_indexes, best_path_length);
+                print_best_variables(best_path_indexes, best_path_length);
             }
 			
             return;
@@ -481,11 +486,11 @@ void find_best_solution(int size, int best_known_cost, const vector<int>& starti
                         continue;
                     }
                     
-                    // Check if now there are unconnectable points surrounded by polygon formed by 2 outter grid points
+                    // Optimisation: Check if now there are unconnectable points surrounded by polygon formed by 2 outter grid points.
 
-                    // Small optimisation: we know that if 2 adjacent outter grid points were just connected, we don't need
-                    // to check for unconnectable points, since they could not have appeared
-                    if (new_idx + 1 != next_expected_grid_edge_idx) {
+                    // Note: We know that if 2 adjacent outter grid points were just connected, we don't need
+                    // to check for unconnectable points, since they could not have appeared.
+                    if (edge_lookup_table[last_idx] + 1 != next_expected_grid_edge_idx) {
                         bool isolated_point_found = false;
 
                         // Iterate over inner grid points
@@ -559,7 +564,7 @@ void find_best_solution(int size, int best_known_cost, const vector<int>& starti
 }
 
 int main() {
-    int n = 4; // Grid size
+    int n = 6; // Grid size
     int best_known_cost = 0; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
 
     // Vertex indices that will be connected one after another starting from index 1.
@@ -567,7 +572,7 @@ int main() {
     // Example of valid starting vertices for grid size 5x5: {9, 2, 3}, which will start algorithm with edges {[1, 9], [9, 2], [2, 3]}.
     // Leaving starting vertices as empty {}, will perform a full search.
     // WARNING: it will not work when outter grid points are connected in anti-clockwise manner (4x4 grid invalid example: {5, 9}).
-    vector<int> starting_vertices = {};
+    vector<int> starting_vertices = { 28, 11 };
 
     find_best_solution(n, best_known_cost, starting_vertices);
 }
