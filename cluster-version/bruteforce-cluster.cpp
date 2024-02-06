@@ -25,7 +25,7 @@ using namespace std;
 // ----------------------------------------------------------------------
 
 // Parameters:
-constexpr const int n = 5; // Grid size
+constexpr const int n = 4; // Grid size
 constexpr const int best_known_cost = 0; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
 
 // Vertex indices that will be connected one after another starting from index 1.
@@ -34,11 +34,8 @@ constexpr const int best_known_cost = 0; // Discards all paths whose cost is low
 // Leaving starting vertices as empty {}, will perform a full search.
 // WARNING: it will not work when outter grid points are connected in anti-clockwise manner (4x4 grid invalid example: {5, 9}).
 vector<vector<int>> starting_vertices_array = {
-  {6},
-  {7},
-  {12},
-  {17},
-  {18}
+  {5},
+  {6}
 };
 
 // ----------------------------------------------------------------------
@@ -682,32 +679,63 @@ void master_job(){
     int total_slaves = world_size - 1;
     int slaves_informed_that_jobs_depleted = 0;
     vector<int> assigned_job_ids(total_slaves, -1);
+    vector<double> timestamps(total_slaves, 0.0);
 	
 	printf("Total slaves: %d\n", total_slaves);
+    printf("\n");
     
     while(slaves_informed_that_jobs_depleted < total_slaves){
         CommunicationData data;
         MPI_Status status;
         MPI_Recv(&data, sizeof(data), MPI_BYTE, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+        int slave_rank = status.MPI_SOURCE;
+        int slave_id = slave_rank - 1;
+        
+        double timestamp = PiraTimer::end("bruteforce").count();
         
         switch(data.message_type){
             case MESSAGE_TYPE_SLAVE_JOB_READY_FOR_TASK:
+                if (assigned_job_ids[slave_id] != -1){
+                    // Slave previously had a job, and is asking for new one
+                    double duration = timestamp - timestamps[slave_id];
+                    printf("Master: Rank %d finished job id %d at time %lf ms. Checking branch took %lf ms.\n",
+                        slave_rank,
+                        assigned_job_ids[slave_id],
+                        timestamp,
+                        duration);
+                    
+                    printf("Starting vertices that finished computing:\n");
+                    for(const int vertex : starting_vertices_array[assigned_job_ids[slave_id]]){
+                        printf("%d ", vertex);
+                    }
+                    printf("\n");
+                    printf("\n");
+                }
+                
+                timestamps[slave_id] = timestamp;
+                
                 // check if there are jobs still remaining
                 if(next_job_id < starting_vertices_array.size()){
-                    printf("Master: Assigned job id %d to rank %d.\n", next_job_id, status.MPI_SOURCE);
-                    assigned_job_ids[status.MPI_SOURCE - 1] = next_job_id;
-                    master_send_message_new_task(status.MPI_SOURCE, next_job_id);
+                    printf("Master: Assigned job id %d to rank %d at time %lf ms.\n", next_job_id, slave_rank, timestamp);
+                    printf("\n");
+                    assigned_job_ids[slave_id] = next_job_id;
+                    master_send_message_new_task(slave_rank, next_job_id);
                     next_job_id++;
                 }
                 // all jobs depleted, tell them go home
                 else{
-                    master_send_message_tasks_depleted(status.MPI_SOURCE);
+                    master_send_message_tasks_depleted(slave_rank);
                     slaves_informed_that_jobs_depleted++;
+                    
+                    if (assigned_job_ids[slave_id] == -1){
+                        printf("Master: WARN: All jobs depleted and rank %d didn't get any jobs.\n", slave_rank);
+                        printf("\n");
+                    }
                 }
                 break;
             case MESSAGE_TYPE_SLAVE_JOB_FOUND_BEST_PATH:
                 if(data.best_cost > best_cost_so_far){
-                    print_best_variables(data, status.MPI_SOURCE, assigned_job_ids[status.MPI_SOURCE - 1]);
+                    print_best_variables(data, slave_rank, assigned_job_ids[slave_id]);
                     best_cost_so_far = data.best_cost;
                 }
                 break;
