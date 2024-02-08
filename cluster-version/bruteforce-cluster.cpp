@@ -30,7 +30,7 @@ constexpr const int best_known_cost = 0; // Discards all paths whose cost is low
 
 // Vertex indices that will be connected one after another starting from index 1.
 // Paths with other starting vertices won't be checked.
-// Example of valid starting vertices for grid size 5x5: {9, 2, 3}, which will start algorithm with edges {[1, 9], [9, 2], [2, 3]}.
+// Example of valid starting vertices for grid size 5x5: {1, 6, 11, 12}, which will start algorithm with edges {[1, 6], [6, 11], [11, 12]}.
 // Leaving starting vertices as empty {}, will perform a full search.
 // WARNING: it will not work when outter grid points are connected in anti-clockwise manner (4x4 grid invalid example: {5, 9}).
 vector<vector<int>> starting_vertices_array = {
