@@ -13,6 +13,20 @@
 
 using namespace std;
 
+constexpr const int n = 5; // Grid size
+constexpr const int best_known_cost = 0; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
+
+// Precomputed intersections may take too much memory with bigger sizes and/or provide no benefit
+constexpr const int MAX_SIZE_FOR_PRECOMUTING_INTERSECTIONS = 6;
+
+// Vertex indices that will be connected one after another starting from index 1.
+// Paths with other starting vertices won't be checked.
+// Example of valid starting vertices for grid size 5x5: {17, 6, 11}, which will start algorithm with edges {[1, 17], [17, 6], [6, 11]}.
+// Leaving starting vertices as empty {}, will perform a full search.
+// WARNING: it will not work when outter grid points are connected in anti-clockwise manner (4x4 grid invalid example: {2, 3}).
+// WARNING: it will not work when 1st vertex is above the diagonal, going from top left to bottom right (4x4 grid invalid example: {7})
+vector<int> starting_vertices = { };
+
 struct Point
 {
     int x;
@@ -381,9 +395,6 @@ void find_best_solution(const int size, const int best_known_cost, const vector<
     vector<PathInfo> pruned_symmetric_distances = prune_symmetric_paths(pruned_clockwise_distances, size);
     vector<PathInfo> sorted_distances = sort_path_distances(pruned_symmetric_distances, size);
 
-    // Precomputed intersections take too much memory with bigger sizes
-    constexpr const int MAX_SIZE_FOR_PRECOMUTING_INTERSECTIONS = 6;
-
     vector<bool> computed_intersections;
     if (size <= MAX_SIZE_FOR_PRECOMUTING_INTERSECTIONS) {
         computed_intersections = precompute_intersections(size);
@@ -639,16 +650,5 @@ void find_best_solution(const int size, const int best_known_cost, const vector<
 }
 
 int main() {
-    constexpr const int n = 5; // Grid size
-    constexpr const int best_known_cost = 0; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
-
-    // Vertex indices that will be connected one after another starting from index 1.
-    // Paths with other starting vertices won't be checked.
-    // Example of valid starting vertices for grid size 5x5: {17, 6, 11}, which will start algorithm with edges {[1, 17], [17, 6], [6, 11]}.
-    // Leaving starting vertices as empty {}, will perform a full search.
-    // WARNING: it will not work when outter grid points are connected in anti-clockwise manner (4x4 grid invalid example: {2, 3}).
-    // WARNING: it will not work when 1st vertex is above the diagonal, going from top left to bottom right (4x4 grid invalid example: {7})
-    vector<int> starting_vertices = { };
-
     find_best_solution(n, best_known_cost, starting_vertices);
 }
