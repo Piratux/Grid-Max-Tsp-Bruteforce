@@ -1,5 +1,4 @@
 // Possible optimisations:
-// - precalculate intersections table
 // - improve cost based pruning, by only counting maximum possible distances with edges that don't intersect and with edges whose vertex isn't taken (not sure if this will improve speed).
 
 // Code made for finding best Hamiltonian cycle to satisfy maximise d(G) function.
