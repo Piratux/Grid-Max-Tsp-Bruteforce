@@ -29,6 +29,17 @@ struct PathInfo
     int idx;
 };
 
+int make_1D_index(int x, int y, int width) {
+    return y * width + x;
+}
+
+Point make_2D_index(int idx, int width) {
+    Point p;
+    p.x = idx % width;
+    p.y = idx / width;
+    return p;
+}
+
 // Source: https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/
 // To find orientation of ordered triplet (p, q, r).
 // The function returns following values
@@ -47,7 +58,7 @@ int orientation(Point p, Point q, Point r) {
 
 // Returns true if line segment 'p1q1' and 'p2q2' intersect (assuming they're not collinear).
 // NOTE: Returns true if 2 segments share a starting/ending point
-bool segments_intersect(Point p1, Point q1, Point p2, Point q2) {
+bool segments_intersect(const Point& p1, const Point& q1, const Point& p2, const Point& q2) {
     int o1 = orientation(p1, q1, p2);
     int o2 = orientation(p1, q1, q2);
     int o3 = orientation(p2, q2, p1);
@@ -59,15 +70,13 @@ bool segments_intersect(Point p1, Point q1, Point p2, Point q2) {
     return false;
 }
 
-int make_1D_index(int x, int y, int width) {
-    return y * width + x;
-}
+// Returns true if line segment 'p1q1' and 'p2q2' intersect (assuming they're not collinear).
+// NOTE: Returns true if 2 segments share a starting/ending point
+bool segments_intersect_fast(int p1_idx, int q1_idx, int p2_idx, int q2_idx, int size2, const vector<bool>& computed_intersections) {
+    int size4 = size2 * size2;
+    int size6 = size4 * size2;
 
-Point make_2D_index(int idx, int width) {
-    Point p;
-    p.x = idx % width;
-    p.y = idx / width;
-    return p;
+    return computed_intersections[q2_idx + size2 * p2_idx + size4 * q1_idx + size6 * p1_idx];
 }
 
 vector<int> make_adjacency_matrix(int size) {
@@ -327,7 +336,30 @@ int find_max_possible_path_length(const vector<PathInfo>& sorted_distances, int 
     return max_path_length;
 }
 
-void find_best_solution(int size, int best_known_cost, const vector<int>& starting_vertices) {
+vector<bool> precompute_intersections(int size) {
+    vector<bool> intersections(pow(size, 8), false);
+    int size_squared = size * size;
+    int idx = 0;
+
+    for (int from1 = 0; from1 < size_squared; from1++) {
+        for (int to1 = 0; to1 < size_squared; to1++) {
+            for (int from2 = 0; from2 < size_squared; from2++) {
+                for (int to2 = 0; to2 < size_squared; to2++) {
+                    Point p1 = make_2D_index(from1, size);
+                    Point p2 = make_2D_index(to1, size);
+                    Point p3 = make_2D_index(from2, size);
+                    Point p4 = make_2D_index(to2, size);
+                    intersections[idx] = segments_intersect(p1, p2, p3, p4);
+                    idx++;
+                }
+            }
+        }
+    }
+
+    return intersections;
+}
+
+void find_best_solution(const int size, const int best_known_cost, const vector<int>& starting_vertices) {
     // algorithm is undefined for these sizes
     if (size <= 1) {
         printf("size = %d is invalid.\n", size);
@@ -349,6 +381,14 @@ void find_best_solution(int size, int best_known_cost, const vector<int>& starti
     vector<PathInfo> pruned_clockwise_distances = prune_clockwise_paths(distances, size);
     vector<PathInfo> pruned_symmetric_distances = prune_symmetric_paths(pruned_clockwise_distances, size);
     vector<PathInfo> sorted_distances = sort_path_distances(pruned_symmetric_distances, size);
+
+    // Precomputed intersections take too much memory with bigger sizes
+    constexpr const int MAX_SIZE_FOR_PRECOMUTING_INTERSECTIONS = 6;
+
+    vector<bool> computed_intersections;
+    if (size <= MAX_SIZE_FOR_PRECOMUTING_INTERSECTIONS) {
+        computed_intersections = precompute_intersections(size);
+    }
 
     int squared_size = size * size;
     int total_outter_points = (size - 1) * 4;
@@ -375,6 +415,23 @@ void find_best_solution(int size, int best_known_cost, const vector<int>& starti
     int best_path_length = best_known_cost;
 
     long long total_found = 0;
+
+    auto check_if_new_vertex_creates_intersections_fast = [&](int new_idx, bool add_last_path) {
+        // Check if there are any intersections with new path with all other ones
+        for (int j = 1; j < path_indexes.size() - 1; ++j) {
+            // First vertex connects with 2nd vertex and with last vertex in the path, 
+            // so we know no intersection will occur there.
+            if (add_last_path && j == 1) {
+                continue;
+            }
+
+            if (segments_intersect_fast(new_idx, path_indexes.back(), path_indexes[j], path_indexes[j - 1], squared_size, computed_intersections)) {
+                return true;
+            }
+        }
+
+        return false;
+    };
 
     auto check_if_new_vertex_creates_intersections = [&](int new_idx, bool add_last_path) {
         // Check if there are any intersections with new path with all other ones
@@ -525,10 +582,15 @@ void find_best_solution(int size, int best_known_cost, const vector<int>& starti
                 }
             }
 
-            bool result = check_if_new_vertex_creates_intersections(new_idx, add_last_path);
-
-            if (result == true) {
-                continue;
+            if (size <= MAX_SIZE_FOR_PRECOMUTING_INTERSECTIONS) {
+                if (check_if_new_vertex_creates_intersections_fast(new_idx, add_last_path)) {
+                    continue;
+                }
+            }
+            else {
+                if (check_if_new_vertex_creates_intersections(new_idx, add_last_path)) {
+                    continue;
+                }
             }
 
             path_indexes.push_back(new_idx);
@@ -578,14 +640,15 @@ void find_best_solution(int size, int best_known_cost, const vector<int>& starti
 }
 
 int main() {
-    int n = 5; // Grid size
-    int best_known_cost = 0; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
+    constexpr const int n = 5; // Grid size
+    constexpr const int best_known_cost = 0; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
 
     // Vertex indices that will be connected one after another starting from index 1.
     // Paths with other starting vertices won't be checked.
-    // Example of valid starting vertices for grid size 5x5: {9, 2, 3}, which will start algorithm with edges {[1, 9], [9, 2], [2, 3]}.
+    // Example of valid starting vertices for grid size 5x5: {17, 6, 11}, which will start algorithm with edges {[1, 17], [17, 6], [6, 11]}.
     // Leaving starting vertices as empty {}, will perform a full search.
-    // WARNING: it will not work when outter grid points are connected in anti-clockwise manner (4x4 grid invalid example: {5, 9}).
+    // WARNING: it will not work when outter grid points are connected in anti-clockwise manner (4x4 grid invalid example: {2, 3}).
+    // WARNING: it will not work when 1st vertex is above the diagonal, going from top left to bottom right (4x4 grid invalid example: {7})
     vector<int> starting_vertices = { };
 
     find_best_solution(n, best_known_cost, starting_vertices);
