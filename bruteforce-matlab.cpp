@@ -7,11 +7,45 @@
 
 using namespace std;
 
+constexpr const int N = 5; // Grid size
+constexpr const int best_known_cost = 0; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
+
+// Precomputed intersections may take too much memory with bigger sizes and/or provide no benefit
+constexpr const int MAX_SIZE_FOR_PRECOMUTING_INTERSECTIONS = 6;
+
+// List of starting edges, that can be specified in any order.
+// Algorithm will find best path that includes these edges.
+// Paths with other starting edges won't be checked.
+// Example of valid starting edges for grid size 4x4: { {1, 6}, {10, 11} }.
+// Leaving starting edges as empty {}, will perform a full search.
+// WARNING: it will not work when outter grid points are connected in anti-clockwise manner.
+// - 4x4 grid invalid edge: {{5, 1}, {2, 3}}.
+// - 4x4 grid valid edge: {{1, 5}, {3, 2}}.
+//vector<vector<int>> starting_edges = { {1, 6}, {10, 11} };
+vector<vector<int>> starting_edges = {  };
+
+struct Point
+{
+    int x;
+    int y;
+};
+
 // Helper structures and functions
 struct min_or_max_result {
     int idx = 0;
     int value = 0;
 };
+
+int make_1D_index(int x, int y, int width) {
+    return y * width + x;
+}
+
+Point make_2D_index(int idx, int width) {
+    Point p;
+    p.x = idx % width;
+    p.y = idx / width;
+    return p;
+}
 
 // Assumes arr is not empty
 min_or_max_result array_min(const vector<int>& arr, size_t max_elements_to_walk_through) {
@@ -140,6 +174,17 @@ bool intersect(double x1, double y1, double x2, double y2, double x3, double y3,
     return false;
 }
 
+bool segments_intersect_fast(int p1_idx, int q1_idx, int p2_idx, int q2_idx, int size2, const vector<bool>& computed_intersections) {
+    printf("%d\n", p1_idx);
+    printf("%d\n", (int)computed_intersections.size());
+    fflush(stdout);
+    int size4 = size2 * size2;
+    int size6 = size4 * size2;
+
+    return computed_intersections[q2_idx + size2 * p2_idx + size4 * q1_idx + size6 * p1_idx];
+    //return computed_intersections.at(q2_idx + size2 * p2_idx + size4 * q1_idx + size6 * p1_idx);
+}
+
 // simplify_dist.m
 // modifies argument A.
 void simplify_dist(
@@ -149,7 +194,9 @@ void simplify_dist(
     const vector<int>& cols,
     int i,
     int j,
-    int d
+    int d,
+    int n2,
+    const vector<bool>& computed_intersections
 ) {
     int m = d;
 
@@ -168,7 +215,8 @@ void simplify_dist(
                     int y3 = pind[i1][1];
                     int x4 = pind[j1][0];
                     int y4 = pind[j1][1];
-                    if (intersect(x1, y1, x2, y2, x3, y3, x4, y4)) {
+                    if (segments_intersect_fast(i, j, i1, j1, n2, computed_intersections)) {
+                    //if (intersect(x1, y1, x2, y2, x3, y3, x4, y4)) {
                         A[r][c] = 0;
                     }
                 }
@@ -303,6 +351,206 @@ vector<vector<int>> gen_dist(int n, const vector<vector<int>>& pnum, const vecto
     return A;
 }
 
+void initialise_variables_from_starting_edges(
+    int n,
+    int& m,
+    vector<vector<int>>& A,
+    int& c0,
+    vector<int>& rows,
+    vector<int>& cols,
+    vector<vector<int>>& paths,
+    vector<int>& lengths,
+    vector<int>& ends,
+    const vector<vector<int>>& distances,
+    const vector<vector<int>>& pnum,
+    const vector<vector<int>>& pind,
+    const vector<bool>& computed_intersections,
+    vector<vector<int>> edges,
+    vector<vector<int>> Anew,
+    vector<int> opposite,
+    vector<int> temp_arr,
+    int h,
+    int d,
+    int c,
+    int r
+) {
+    int n2 = n * n;
+    m = n2;
+    c0 = 0;
+
+    int hmax = starting_edges.size();
+    vector<int> A1;
+    vector<int> A2;
+    for (int i = 0; i < starting_edges.size(); i++) {
+        A1.push_back(starting_edges[i][0] - 1);
+        A2.push_back(starting_edges[i][1] - 1);
+    }
+
+    while (h < hmax) {
+        d = m - h;
+        int a1 = A1[h];
+        int a2 = A2[h];
+        c0 = c0 + distances[a1][a2];
+        edges[h][0] = a1;
+        edges[h][1] = a2;
+
+        // A(1:d,d+1:m)=0;
+        for (int i = 0; i < d; ++i) {
+            for (int j = d; j < m; ++j) {
+                A[i][j] = 0;
+            }
+        }
+        // A(d+1:m,1:m)=0;
+        for (int i = d; i < m; ++i) {
+            for (int j = 0; j < m; ++j) {
+                A[i][j] = 0;
+            }
+        }
+
+        h++;
+        d = m - h;
+        r = array_find(rows, rows.size(), A1[h - 1]);
+        c = array_find(cols, cols.size(), A2[h - 1]);
+
+        for (int i = 0; i < r; ++i) {
+            for (int j = 0; j < d + 1; ++j) {
+                Anew[i][j] = A[i][j];
+            }
+        }
+
+        for (int i = r; i < d; ++i) {
+            for (int j = 0; j < d + 1; ++j) {
+                Anew[i][j] = A[i + 1][j];
+            }
+        }
+
+        for (int j = c; j < d; ++j) {
+            for (int i = 0; i < d; ++i) {
+                Anew[i][j] = Anew[i][j + 1];
+            }
+        }
+
+        for (int i = 0; i < d; ++i) {
+            for (int j = 0; j < d; ++j) {
+                A[i][j] = Anew[i][j];
+            }
+        }
+
+        int loc = 0;
+        loc = array_find(rows, rows.size(), a1);
+        for (int i = loc; i < d; i++) {
+            rows[i] = rows[i + 1];
+        }
+
+        loc = array_find(cols, cols.size(), a2);
+        for (int i = loc; i < d; i++) {
+            cols[i] = cols[i + 1];
+        }
+
+        loc = array_find(ends, ends.size(), a1);
+        if (loc == -1) {
+            if (lengths[a2] > 1) {
+                // Case 1: There is no path that ends in a1 but there is a path P starting in a2 --
+                // we need to add edge [a1 a2] to the front of P.
+                for (int i = 0; i < lengths[a2]; i++) {
+                    temp_arr[i] = paths[a2][i];
+                }
+                for (int i = 0; i < lengths[a2]; i++) {
+                    paths[a1][i + 1] = temp_arr[i];
+                }
+                lengths[a1] = lengths[a2] + 1;
+                ends[a1] = ends[a2];
+
+                ends[a2] = -1;
+                opposite[0] = ends[a1];
+                opposite[1] = a1;
+            }
+            else {
+                // Case 2: There is no path that ends in a1 and there is no path starting in a2 --
+                // we have to create new path equal to one edge [a1 a2].
+                paths[a1][1] = a2;
+                lengths[a1] = 2;
+                ends[a1] = a2;
+
+                opposite[0] = a2;
+                opposite[1] = a1;
+            }
+        }
+        else {
+            // Case 3: There is a (unique) path that ends in a1. It starts in i1. We add edge [a1 a2] to its end.              
+            int i1 = loc;
+            lengths[i1] = lengths[i1] + 1;
+            paths[i1][lengths[i1] - 1] = a2;
+            ends[i1] = a2;
+            
+            opposite[0] = a2;
+            opposite[1] = i1;
+
+            // Case 4: There is a path that ends in a1 and there is a path starting in a2 --
+            // we have to connect two old paths into one new path (connect them with an edge [a1 a2]).
+            if (lengths[a2] > 1) {
+                for (int i = 0; i < lengths[a2]; i++) {
+                    temp_arr[i] = paths[a2][i];
+                }
+                for (int i = 0; i < lengths[a2]; i++) {
+                    paths[i1][i + lengths[i1] - 1] = temp_arr[i];
+                }
+                lengths[i1] = lengths[i1] + lengths[a2] - 1;
+                ends[i1] = ends[a2];
+                
+                ends[a2] = -1;
+                opposite[0] = ends[i1];
+                opposite[1] = i1;
+            }
+        }
+
+        // We check if both ends of new path belong to remaining rows
+        // and columns. If yes, we interdict an edge between them.
+        int B = 0;
+        int C = 0;
+        for (int i = 0; i < d; i++) {
+            if (rows[i] == opposite[0]) {
+                B++;
+            }
+            if (cols[i] == opposite[1]) {
+                C++;
+            }
+        }
+        if (B + C == 2) {
+            int i = array_find(rows, d, opposite[0]);
+            int j = array_find(cols, d, opposite[1]);
+            A[i][j] = 0;
+        }
+
+        simplify_dist(A, pind, rows, cols, a1, a2, d, n2, computed_intersections);
+    }
+
+    m = n * n - starting_edges.size();
+}
+
+vector<bool> precompute_intersections(int size) {
+    vector<bool> intersections(pow(size, 8), false);
+    int size_squared = size * size;
+    int idx = 0;
+
+    for (int from1 = 0; from1 < size_squared; from1++) {
+        for (int to1 = 0; to1 < size_squared; to1++) {
+            for (int from2 = 0; from2 < size_squared; from2++) {
+                for (int to2 = 0; to2 < size_squared; to2++) {
+                    Point p1 = make_2D_index(from1, size);
+                    Point p2 = make_2D_index(to1, size);
+                    Point p3 = make_2D_index(from2, size);
+                    Point p4 = make_2D_index(to2, size);
+                    intersections[idx] = intersect(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y);
+                    idx++;
+                }
+            }
+        }
+    }
+
+    return intersections;
+}
+
 // Hamilton4n.m
 void solveMaxTSP(const int n) {
     PiraTimer::start("bruteforce");
@@ -395,6 +643,11 @@ void solveMaxTSP(const int n) {
     // h = -1 will mean that all possible routes were checked.
     int h = 0; // #INDEXES_FROM_0
 
+    vector<bool> computed_intersections;
+    if (n <= MAX_SIZE_FOR_PRECOMUTING_INTERSECTIONS) {
+        computed_intersections = precompute_intersections(n);
+    }
+
     // Undeclared variables found used in algorithm
     int d = 0; // #INDEXES_FROM_1
     int factor = 0; // #VALUE
@@ -418,6 +671,8 @@ void solveMaxTSP(const int n) {
 
     vector<int> srow(m, 0);
     vector<int> scol(m, 0);
+
+    initialise_variables_from_starting_edges(n, m, A, c0, rows, cols, paths, lengths, ends, distances, pnum, pind, computed_intersections, edges, Anew, opposite, temp_arr, h, d, c, r);
 
     auto calculate_min_and_factor = [&]() {
         for (int i = 0; i < m; ++i) {
@@ -515,8 +770,8 @@ void solveMaxTSP(const int n) {
                     A[i][j] = 0;
                 }
             }
-            // A(d+1:n2,1:m)=0;
-            for (int i = d; i < n2; ++i) {
+            // A(d+1:m,1:m)=0;
+            for (int i = d; i < m; ++i) {
                 for (int j = 0; j < m; ++j) {
                     A[i][j] = 0;
                 }
@@ -691,7 +946,7 @@ void solveMaxTSP(const int n) {
                     A_old = A_last;
                 }
 
-                simplify_dist(A_old, pind, rows, cols, a1, a2, d);
+                simplify_dist(A_old, pind, rows, cols, a1, a2, d, n2, computed_intersections);
                 for (int i = 0; i < d; i++) {
                     for (int j = 0; j < d; j++) {
                         A[i][j] = A_old[i][j];
@@ -798,6 +1053,5 @@ void solveMaxTSP(const int n) {
 }
 
 int main() {
-    int n = 4;
-    solveMaxTSP(n);
+    solveMaxTSP(N);
 }
