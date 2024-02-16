@@ -458,10 +458,10 @@ void solveMaxTSP(const int n) {
                 // route cannot be prolonged, number of finished partial routes
                 // increases by 1.
                 // Instead of finishing current iteration, we move
-                // to next iteration of the most inner cycle(instruction "continue").
+                // to next iteration of the most inner cycle(instruction "break").
                 total_routes++;
                 print_variables(total_routes, edges, best_cost, h);
-                continue;
+                break;
             }
 
             // This line is reached if factor=1, i.e. there exists at least one
@@ -593,7 +593,7 @@ void solveMaxTSP(const int n) {
                         // If new path is a cycle, then current partial route
                         // cannot be prolonged, go to next iteration.
                         if (a1 == ends[a1]) {
-                            continue;
+                            break;
                         }
 
                         ends[a2] = -1;
@@ -607,7 +607,7 @@ void solveMaxTSP(const int n) {
                         lengths[a1] = 2;
                         ends[a1] = a2;
                         if (a1 == ends[a1]) {
-                            continue;
+                            break;
                         }
                         opposite[0] = a2;
                         opposite[1] = a1;
@@ -620,7 +620,7 @@ void solveMaxTSP(const int n) {
                     paths[i1][lengths[i1] - 1] = a2;
                     ends[i1] = a2;
                     if (i1 == ends[i1]) {
-                        continue;
+                        break;
                     }
                     opposite[0] = a2;
                     opposite[1] = i1;
@@ -637,7 +637,7 @@ void solveMaxTSP(const int n) {
                         lengths[i1] = lengths[i1] + lengths[a2] - 1;
                         ends[i1] = ends[a2];
                         if (i1 == ends[i1]) {
-                            continue;
+                            break;
                         }
                         ends[a2] = -1;
                         opposite[0] = ends[i1];
@@ -705,7 +705,7 @@ void solveMaxTSP(const int n) {
                 if (factor == 0) {
                     total_routes++;
                     print_variables(total_routes, edges, best_cost, h);
-                    continue;
+                    break;
                 }
 
                 // In case of 2x2 matrix it could appear that after removing row
@@ -715,7 +715,7 @@ void solveMaxTSP(const int n) {
                 if (d == 1 && A[0][0] == 0) {
                     total_routes++;
                     print_variables(total_routes, edges, best_cost, h);
-                    continue;
+                    break;
                 }
 
                 // After simplification it could appear that there are no more edges long enough
@@ -745,7 +745,7 @@ void solveMaxTSP(const int n) {
                 if (dist + S + c0 < best_cost) {
                     total_routes++;
                     print_variables(total_routes, edges, best_cost, h);
-                    continue;
+                    break;
                 }
             }
 
