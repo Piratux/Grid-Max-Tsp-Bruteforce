@@ -7,11 +7,8 @@
 
 using namespace std;
 
-constexpr const int N = 5; // Grid size
-constexpr const int best_known_cost = 0; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
-
-// Precomputed intersections may take too much memory with bigger sizes and/or provide no benefit
-constexpr const int MAX_SIZE_FOR_PRECOMUTING_INTERSECTIONS = 6;
+constexpr const int N = 4; // Grid size
+constexpr const int BEST_KNOWN_COST = 0; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
 
 // List of starting edges, that can be specified in any order.
 // Algorithm will find best path that includes these edges.
@@ -19,33 +16,16 @@ constexpr const int MAX_SIZE_FOR_PRECOMUTING_INTERSECTIONS = 6;
 // Example of valid starting edges for grid size 4x4: { {1, 6}, {10, 11} }.
 // Leaving starting edges as empty {}, will perform a full search.
 // WARNING: it will not work when outter grid points are connected in anti-clockwise manner.
-// - 4x4 grid invalid edge: {{5, 1}, {2, 3}}.
-// - 4x4 grid valid edge: {{1, 5}, {3, 2}}.
+// - 4x4 grid invalid edges: {{5, 1}, {2, 3}}.
+// - 4x4 grid valid edges: {{1, 5}, {3, 2}}.
 //vector<vector<int>> starting_edges = { {1, 6}, {10, 11} };
-vector<vector<int>> starting_edges = {  };
-
-struct Point
-{
-    int x;
-    int y;
-};
+const vector<vector<int>> STARTING_EDGES = { {1, 6}, {10, 11} };
 
 // Helper structures and functions
 struct min_or_max_result {
     int idx = 0;
     int value = 0;
 };
-
-int make_1D_index(int x, int y, int width) {
-    return y * width + x;
-}
-
-Point make_2D_index(int idx, int width) {
-    Point p;
-    p.x = idx % width;
-    p.y = idx / width;
-    return p;
-}
 
 // Assumes arr is not empty
 min_or_max_result array_min(const vector<int>& arr, size_t max_elements_to_walk_through) {
@@ -174,17 +154,6 @@ bool intersect(double x1, double y1, double x2, double y2, double x3, double y3,
     return false;
 }
 
-bool segments_intersect_fast(int p1_idx, int q1_idx, int p2_idx, int q2_idx, int size2, const vector<bool>& computed_intersections) {
-    printf("%d\n", p1_idx);
-    printf("%d\n", (int)computed_intersections.size());
-    fflush(stdout);
-    int size4 = size2 * size2;
-    int size6 = size4 * size2;
-
-    return computed_intersections[q2_idx + size2 * p2_idx + size4 * q1_idx + size6 * p1_idx];
-    //return computed_intersections.at(q2_idx + size2 * p2_idx + size4 * q1_idx + size6 * p1_idx);
-}
-
 // simplify_dist.m
 // modifies argument A.
 void simplify_dist(
@@ -194,9 +163,7 @@ void simplify_dist(
     const vector<int>& cols,
     int i,
     int j,
-    int d,
-    int n2,
-    const vector<bool>& computed_intersections
+    int d
 ) {
     int m = d;
 
@@ -215,8 +182,7 @@ void simplify_dist(
                     int y3 = pind[i1][1];
                     int x4 = pind[j1][0];
                     int y4 = pind[j1][1];
-                    if (segments_intersect_fast(i, j, i1, j1, n2, computed_intersections)) {
-                    //if (intersect(x1, y1, x2, y2, x3, y3, x4, y4)) {
+                    if (intersect(x1, y1, x2, y2, x3, y3, x4, y4)) {
                         A[r][c] = 0;
                     }
                 }
@@ -364,7 +330,6 @@ void initialise_variables_from_starting_edges(
     const vector<vector<int>>& distances,
     const vector<vector<int>>& pnum,
     const vector<vector<int>>& pind,
-    const vector<bool>& computed_intersections,
     vector<vector<int>> edges,
     vector<vector<int>> Anew,
     vector<int> opposite,
@@ -378,12 +343,12 @@ void initialise_variables_from_starting_edges(
     m = n2;
     c0 = 0;
 
-    int hmax = starting_edges.size();
+    int hmax = STARTING_EDGES.size();
     vector<int> A1;
     vector<int> A2;
-    for (int i = 0; i < starting_edges.size(); i++) {
-        A1.push_back(starting_edges[i][0] - 1);
-        A2.push_back(starting_edges[i][1] - 1);
+    for (int i = 0; i < STARTING_EDGES.size(); i++) {
+        A1.push_back(STARTING_EDGES[i][0] - 1);
+        A2.push_back(STARTING_EDGES[i][1] - 1);
     }
 
     while (h < hmax) {
@@ -522,33 +487,10 @@ void initialise_variables_from_starting_edges(
             A[i][j] = 0;
         }
 
-        simplify_dist(A, pind, rows, cols, a1, a2, d, n2, computed_intersections);
+        simplify_dist(A, pind, rows, cols, a1, a2, d);
     }
 
-    m = n * n - starting_edges.size();
-}
-
-vector<bool> precompute_intersections(int size) {
-    vector<bool> intersections(pow(size, 8), false);
-    int size_squared = size * size;
-    int idx = 0;
-
-    for (int from1 = 0; from1 < size_squared; from1++) {
-        for (int to1 = 0; to1 < size_squared; to1++) {
-            for (int from2 = 0; from2 < size_squared; from2++) {
-                for (int to2 = 0; to2 < size_squared; to2++) {
-                    Point p1 = make_2D_index(from1, size);
-                    Point p2 = make_2D_index(to1, size);
-                    Point p3 = make_2D_index(from2, size);
-                    Point p4 = make_2D_index(to2, size);
-                    intersections[idx] = intersect(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y);
-                    idx++;
-                }
-            }
-        }
-    }
-
-    return intersections;
+    m = n * n - STARTING_EDGES.size();
 }
 
 // Hamilton4n.m
@@ -612,7 +554,7 @@ void solveMaxTSP(const int n) {
     vector<int> lengths(n2, 1); // #INDEXES_FROM_1
     vector<int> ends(n2, -1); // #INDEXES_FROM_0
     vector<int> best_route(n2, 0); // #INDEXES_FROM_0
-    int cost0 = 0; // #VALUE (UNUSED?)
+    int cost0 = BEST_KNOWN_COST; // #VALUE (UNUSED?)
     int best_cost = cost0; // #VALUE
     int total_routes = 0; // #VALUE
 
@@ -643,11 +585,6 @@ void solveMaxTSP(const int n) {
     // h = -1 will mean that all possible routes were checked.
     int h = 0; // #INDEXES_FROM_0
 
-    vector<bool> computed_intersections;
-    if (n <= MAX_SIZE_FOR_PRECOMUTING_INTERSECTIONS) {
-        computed_intersections = precompute_intersections(n);
-    }
-
     // Undeclared variables found used in algorithm
     int d = 0; // #INDEXES_FROM_1
     int factor = 0; // #VALUE
@@ -672,7 +609,7 @@ void solveMaxTSP(const int n) {
     vector<int> srow(m, 0);
     vector<int> scol(m, 0);
 
-    initialise_variables_from_starting_edges(n, m, A, c0, rows, cols, paths, lengths, ends, distances, pnum, pind, computed_intersections, edges, Anew, opposite, temp_arr, h, d, c, r);
+    initialise_variables_from_starting_edges(n, m, A, c0, rows, cols, paths, lengths, ends, distances, pnum, pind, edges, Anew, opposite, temp_arr, h, d, c, r);
 
     auto calculate_min_and_factor = [&]() {
         for (int i = 0; i < m; ++i) {
@@ -946,7 +883,7 @@ void solveMaxTSP(const int n) {
                     A_old = A_last;
                 }
 
-                simplify_dist(A_old, pind, rows, cols, a1, a2, d, n2, computed_intersections);
+                simplify_dist(A_old, pind, rows, cols, a1, a2, d);
                 for (int i = 0; i < d; i++) {
                     for (int j = 0; j < d; j++) {
                         A[i][j] = A_old[i][j];
