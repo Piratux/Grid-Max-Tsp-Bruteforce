@@ -43,7 +43,7 @@ int array_find(const vector<int>& arr, size_t max_elements_to_search_through, in
 }
 
 void print_variables(int total_routes, const vector<vector<int>>& edges, int best_cost, int h) {
-    if (total_routes % 100000 == 0) {
+    if (total_routes % 10000000 == 0) {
         printf("Iterations: %d\n", total_routes);
 
         printf("edge_order:\n");
@@ -122,7 +122,8 @@ bool intersect(double x1, double y1, double x2, double y2, double x3, double y3,
     if ((u >= 0 && u <= 1.0) && (t >= 0 && t <= 1.0)) {
         xi = ((x3 + u * (x4 - x3)) + (x1 + t * (x2 - x1))) / 2;
         yi = ((y3 + u * (y4 - y3)) + (y1 + t * (y2 - y1))) / 2;
-    } else {
+    }
+    else {
         xi = NAN;
         yi = NAN;
     }
@@ -219,23 +220,26 @@ vector<vector<int>> gen_dist(int n, const vector<vector<int>>& pnum, const vecto
 
     // Now we have to restore the distances for some pairs of vertices that
     // belong to the same boundary
-    for (int i = 0; i < m; ++i) {
-        for (int dx = -1; dx <= 1; dx += 2) {
-            int x = pind[i][0] + dx + 1;
-            int y = pind[i][1] + 1;
-            if (1 <= x && x <= n) {
-                int j = pnum[x - 1][y - 1];
-                A[i][j] = 1;
-            }
-        }
-        for (int dy = -1; dy <= 1; dy += 2) {
-            int y = pind[i][1] + dy + 1;
-            int x = pind[i][0] + 1;
-            if (1 <= y && y <= n) {
-                int j = pnum[x - 1][y - 1];
-                A[i][j] = 1;
-            }
-        }
+
+    for (int k = 0; k < n - 1; ++k) {
+        int i = pnum[k][0];
+        int j = pnum[k + 1][0];
+        A[i][j] = 1;
+    }
+    for (int k = 1; k < n; ++k) {
+        int i = pnum[k][n - 1];
+        int j = pnum[k - 1][n - 1];
+        A[i][j] = 1;
+    }
+    for (int k = 1; k < n; ++k) {
+        int i = pnum[0][k];
+        int j = pnum[0][k - 1];
+        A[i][j] = 1;
+    }
+    for (int k = 0; k < n - 1; ++k) {
+        int i = pnum[n - 1][k];
+        int j = pnum[n - 1][k + 1];
+        A[i][j] = 1;
     }
 
     // Finally, we consider all diagonals as well as horizontals and verticals
@@ -323,7 +327,7 @@ void solveMaxTSP(const int n) {
         rows[i] = i;
         cols[i] = i;
     }
-    
+
     int dist = 0; // #VALUE
     vector<vector<int>> edges(n2, vector<int>(2, 0)); // #INDEXES_FROM_0
 
@@ -750,7 +754,7 @@ void solveMaxTSP(const int n) {
             // The case when two vertices of the grid are left
             // and still there is an edge connecting them -- a new Hamilton cycle is found. 
             // It remains to check if the new route is better than the best found before.
-            if (d == 1 && A[0][0] > 0){
+            if (d == 1 && A[0][0] > 0) {
                 total_routes++;
                 print_variables(total_routes, edges, best_cost, h);
 
