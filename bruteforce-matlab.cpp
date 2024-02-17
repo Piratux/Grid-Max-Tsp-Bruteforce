@@ -318,6 +318,7 @@ vector<vector<int>> gen_dist(int n, const vector<vector<int>>& pnum, const vecto
 }
 
 void initialise_variables_from_starting_edges(
+    const vector<vector<int>>& starting_edges,
     int n,
     int& m,
     vector<vector<int>>& A,
@@ -343,12 +344,12 @@ void initialise_variables_from_starting_edges(
     m = n2;
     c0 = 0;
 
-    int hmax = STARTING_EDGES.size();
+    int hmax = starting_edges.size();
     vector<int> A1;
     vector<int> A2;
-    for (int i = 0; i < STARTING_EDGES.size(); i++) {
-        A1.push_back(STARTING_EDGES[i][0] - 1);
-        A2.push_back(STARTING_EDGES[i][1] - 1);
+    for (int i = 0; i < starting_edges.size(); i++) {
+        A1.push_back(starting_edges[i][0] - 1);
+        A2.push_back(starting_edges[i][1] - 1);
     }
 
     while (h < hmax) {
@@ -494,7 +495,7 @@ void initialise_variables_from_starting_edges(
 }
 
 // Hamilton4n.m
-void solveMaxTSP(const int n) {
+void solveMaxTSP(const int n, const vector<vector<int>>& starting_edges) {
     PiraTimer::start("bruteforce");
 
     // Initialization to solve maxTSP -- find maximal weight Hamilton cycle
@@ -609,7 +610,7 @@ void solveMaxTSP(const int n) {
     vector<int> srow(m, 0);
     vector<int> scol(m, 0);
 
-    initialise_variables_from_starting_edges(n, m, A, c0, rows, cols, paths, lengths, ends, distances, pnum, pind, edges, Anew, opposite, temp_arr, h, d, c, r);
+    initialise_variables_from_starting_edges(starting_edges, n, m, A, c0, rows, cols, paths, lengths, ends, distances, pnum, pind, edges, Anew, opposite, temp_arr, h, d, c, r);
 
     auto calculate_min_and_factor = [&]() {
         for (int i = 0; i < m; ++i) {
@@ -990,5 +991,5 @@ void solveMaxTSP(const int n) {
 }
 
 int main() {
-    solveMaxTSP(N);
+    solveMaxTSP(N, STARTING_EDGES);
 }
