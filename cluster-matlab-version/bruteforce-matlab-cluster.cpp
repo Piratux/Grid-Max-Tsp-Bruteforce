@@ -1,9 +1,12 @@
+#include <mpi.h>
+
 #include <vector>
 #include <numeric>
 
 #include <cstdio>
 #include <cmath>
 #include <cstdint>
+#include <cinttypes>
 
 #include "PiraTimer.h"
 
@@ -20,13 +23,75 @@ constexpr const int BEST_KNOWN_COST = 0; // Discards all paths whose cost is low
 // WARNING: it will not work when outter grid points are connected in anti-clockwise manner.
 // - 4x4 grid invalid edges: {{5, 1}, {2, 3}}.
 // - 4x4 grid valid edges: {{1, 5}, {3, 2}}.
-const vector<vector<int>> STARTING_EDGES = { {1, 6}, {10, 11} };
+const vector<vector<vector<int>>> STARTING_EDGES_ARRAY = {
+	{ {1, 6}, {10, 11} },
+	{ {7, 8} }
+};
+
+// ------IMPLEMENTATION------
+
+// May as well store it here
+int world_size;
+int world_rank;
+constexpr const int MASTER_RANK = 0;
+constexpr const int n2 = N * N;
+
+const int MESSAGE_TYPE_MASTER_JOB_NEW_TASK = 0;
+const int MESSAGE_TYPE_MASTER_JOBS_TASKS_DEPLETED = 1;
+
+const int MESSAGE_TYPE_SLAVE_JOB_FOUND_BEST_PATH = 0;
+const int MESSAGE_TYPE_SLAVE_JOB_READY_FOR_TASK = 1;
+
+// Preferably, we should create different packets for different message types.
+// But since we're lazy, we'll just reuse this one for multiple message types.
+struct CommunicationData{
+    // shared data
+    int message_type;
+    
+    // master data
+    int starting_vertices_id;
+    
+    // slave data
+    int path_indexes[n2];
+    int best_cost;
+};
 
 // Helper structures and functions
 struct min_or_max_result {
     int idx = 0;
     int value = 0;
 };
+
+void share_best_variables(const vector<int>& path_indexes, int best_cost){
+    CommunicationData data;
+    for(int i = 0; i < n2; i++){
+        data.path_indexes[i] = path_indexes[i];
+    }
+    data.best_cost = best_cost;
+    data.message_type = MESSAGE_TYPE_SLAVE_JOB_FOUND_BEST_PATH;
+    MPI_Send(&data, sizeof(data), MPI_BYTE, MASTER_RANK, 0, MPI_COMM_WORLD);
+}
+
+void print_best_variables(const CommunicationData& result_data, int from_rank, int job_id) {
+    printf("best path found by rank %d for job id %d\n", from_rank, job_id);
+    
+    printf("path_indexes:\n");
+    for (int i = 0; i < n2; ++i) {
+        printf("%d ", result_data.path_indexes[i] + 1);
+    }
+    printf("\n");
+
+    printf("path edges:\n");
+    for (int i = 1; i < n2; ++i) {
+        printf("%d %d\n", result_data.path_indexes[i - 1] + 1, result_data.path_indexes[i] + 1);
+    }
+    printf("%d %d\n", result_data.path_indexes[n2 - 1] + 1, result_data.path_indexes[0] + 1);
+
+    printf("best_cost: %d\n", result_data.best_cost);
+
+    printf("time %lf ms\n", PiraTimer::end("bruteforce").count());
+    printf("\n");
+}
 
 // Assumes arr is not empty
 min_or_max_result array_min(const vector<int>& arr, size_t max_elements_to_walk_through) {
@@ -54,74 +119,6 @@ int array_find(const vector<int>& arr, size_t max_elements_to_search_through, in
     }
 
     return -1;
-}
-
-void print_variables(int64_t total_routes, const vector<vector<int>>& edges, int best_cost, int h) {
-    if (total_routes % 10000000 == 0) {
-        printf("Iterations: %lld\n", total_routes);
-
-        printf("edge_order:\n");
-        for (int i = 0; i < h; ++i) {
-            for (int j = 0; j < 2; ++j) {
-                printf("%d ", edges[i][j] + 1);
-            }
-            printf("\n");
-        }
-
-        printf("current_cost: %d\n", best_cost);
-        printf("time2 %lf ms\n", PiraTimer::end("bruteforce").count());
-        printf("\n");
-    }
-}
-
-void print_best_variables(const vector<int>& best_route, const vector<vector<int>>& edges, int best_cost, int h, int64_t total_routes) {
-    printf("best_route:\n");
-    for (int i = 0; i < best_route.size(); ++i) {
-        printf("%d ", best_route[i] + 1);
-    }
-    printf("\n");
-
-    printf("Best edges:\n");
-    for (int i = 1; i < best_route.size(); ++i) {
-        printf("%d %d\n", best_route[i - 1] + 1, best_route[i] + 1);
-    }
-    printf("%d %d\n", best_route[best_route.size() - 1] + 1, best_route[0] + 1);
-
-    printf("edge_order:\n");
-    for (int i = 0; i < h; ++i) {
-        for (int j = 0; j < 2; ++j) {
-            printf("%d ", edges[i][j] + 1);
-        }
-        printf("\n");
-    }
-
-    printf("best_cost: %d\n", best_cost);
-
-    printf("routes_in_total: %lld\n", total_routes);
-    printf("time1 %lf ms\n", PiraTimer::end("bruteforce").count());
-    printf("\n");
-}
-
-void print_final_variables(int64_t total_routes, int best_cost, int cost0, const vector<int>& best_route, int64_t routes_in_total) {
-    printf("Total number of routes: %lld\n", total_routes);
-
-    if (best_cost > cost0) {
-        printf("Optimal route:\n");
-        for (int i = 0; i < best_route.size(); ++i) {
-            printf("%d ", best_route[i] + 1);
-        }
-        printf("\n");
-
-        printf("Optimal edges:\n");
-        for (int i = 1; i < best_route.size(); ++i) {
-            printf("%d %d\n", best_route[i - 1] + 1, best_route[i] + 1);
-        }
-        printf("%d %d\n", best_route[best_route.size() - 1] + 1, best_route[0] + 1);
-
-        printf("Optimal_cost: %d\n", best_cost);
-
-        printf("Optimal route was: %lld\n", routes_in_total);
-    }
 }
 
 // intersect.m
@@ -521,8 +518,6 @@ bool starting_edges_are_valid(const int n, const vector<vector<int>>& starting_e
 
 // Hamilton4n.m
 void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int>>& starting_edges) {
-    PiraTimer::start("bruteforce");
-
     // Initialization to solve maxTSP -- find maximal weight Hamilton cycle
     // Grid nxn with n2 = n ^ 2 vertices, t0 to measure program execution time
     // 
@@ -634,7 +629,7 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
 
     vector<int> srow(m, 0);
     vector<int> scol(m, 0);
-
+    
     if (!starting_edges_are_valid(n, starting_edges, distances)) {
         return;
     }
@@ -682,7 +677,6 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
                 // Instead of finishing current iteration, we move
                 // to next iteration of the most inner cycle(instruction "break").
                 total_routes++;
-                print_variables(total_routes, edges, best_cost, h);
                 break;
             }
 
@@ -926,7 +920,6 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
                 calculate_min_and_factor();
                 if (factor == 0) {
                     total_routes++;
-                    print_variables(total_routes, edges, best_cost, h);
                     break;
                 }
 
@@ -936,7 +929,6 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
                 // we go to new iteration.
                 if (d == 1 && A[0][0] == 0) {
                     total_routes++;
-                    print_variables(total_routes, edges, best_cost, h);
                     break;
                 }
 
@@ -966,7 +958,6 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
 
                 if (dist + S + c0 < best_cost) {
                     total_routes++;
-                    print_variables(total_routes, edges, best_cost, h);
                     break;
                 }
             }
@@ -978,8 +969,6 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
             // It remains to check if the new route is better than the best found before.
             if (d == 1 && A[0][0] > 0) {
                 total_routes++;
-                print_variables(total_routes, edges, best_cost, h);
-
                 for (int i = 0; i < paths[opposite[1]].size(); i++) {
                     M[i] = paths[opposite[1]][i];
                 }
@@ -990,7 +979,7 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
                     }
                     best_cost = dist;
                     routes_in_total = total_routes;
-                    print_best_variables(best_route, edges, best_cost, h, total_routes);
+					share_best_variables(best_route, best_cost);
                 }
             }
         }
@@ -1010,15 +999,157 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
             ends = all_ends[h];
             dist = costs[h];
         }
-        // If previous depth was -1, we display final results and stop 
-        else {
-            print_final_variables(total_routes, best_cost, cost0, best_route, routes_in_total);
+    }
+}
+
+void master_send_message_new_task(int slave_rank, int next_job_id){
+    CommunicationData data;
+    data.message_type = MESSAGE_TYPE_MASTER_JOB_NEW_TASK;
+    data.starting_vertices_id = next_job_id;
+    MPI_Send(&data, sizeof(data), MPI_BYTE, slave_rank, 0, MPI_COMM_WORLD);
+}
+
+void master_send_message_tasks_depleted(int slave_rank){
+    CommunicationData data;
+    data.message_type = MESSAGE_TYPE_MASTER_JOBS_TASKS_DEPLETED;
+    MPI_Send(&data, sizeof(data), MPI_BYTE, slave_rank, 0, MPI_COMM_WORLD);
+}
+
+void slave_send_messsage_ready_for_task(){
+    CommunicationData data;
+    data.message_type = MESSAGE_TYPE_SLAVE_JOB_READY_FOR_TASK;
+    MPI_Send(&data, sizeof(data), MPI_BYTE, MASTER_RANK, 0, MPI_COMM_WORLD);
+}
+
+int slave_receive_task_id(){
+    CommunicationData data;
+    MPI_Status status;
+    MPI_Recv(&data, sizeof(data), MPI_BYTE, MASTER_RANK, 0, MPI_COMM_WORLD, &status);
+    switch(data.message_type){
+        case MESSAGE_TYPE_MASTER_JOBS_TASKS_DEPLETED:
+            return -1;
+            break;
+        case MESSAGE_TYPE_MASTER_JOB_NEW_TASK:
+            return data.starting_vertices_id;
+            break;
+        default:
+            printf("ERROR Slave: received unknown message type\n");
+            return -1;
+            break;
+    }
+}
+
+void master_job(){
+    // Assigns tasks to slaves and collects their results to print.
+    PiraTimer::start("bruteforce");
+    
+    int best_cost_so_far = 0;
+    int next_job_id = 0;
+    int total_slaves = world_size - 1;
+    int slaves_informed_that_jobs_depleted = 0;
+    vector<int> assigned_job_ids(total_slaves, -1);
+    vector<double> timestamps(total_slaves, 0.0);
+    
+	printf("--Bruteforce Matlab version--\n");
+	printf("Total slaves: %d\n", total_slaves);
+    printf("\n");
+    
+    while(slaves_informed_that_jobs_depleted < total_slaves){
+        CommunicationData data;
+        MPI_Status status;
+        MPI_Recv(&data, sizeof(data), MPI_BYTE, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+        int slave_rank = status.MPI_SOURCE;
+        int slave_id = slave_rank - 1;
+        
+        double timestamp = PiraTimer::end("bruteforce").count();
+        
+        switch(data.message_type){
+            case MESSAGE_TYPE_SLAVE_JOB_READY_FOR_TASK:
+                if (assigned_job_ids[slave_id] != -1){
+                    // Slave previously had a job, and is asking for new one
+                    double duration = timestamp - timestamps[slave_id];
+                    printf("Master: Rank %d finished job id %d at time %lf ms. Checking branch took %lf ms.\n",
+                        slave_rank,
+                        assigned_job_ids[slave_id],
+                        timestamp,
+                        duration);
+                    
+                    printf("Starting edges that finished computing:\n");
+                    for(const auto& edge : STARTING_EDGES_ARRAY[assigned_job_ids[slave_id]]){
+                        printf("[%d, %d], ", edge[0], edge[1]);
+                    }
+                    printf("\n");
+                    printf("\n");
+                }
+                
+                timestamps[slave_id] = timestamp;
+                
+                // check if there are jobs still remaining
+                if(next_job_id < STARTING_EDGES_ARRAY.size()){
+                    printf("Master: Assigned job id %d to rank %d at time %lf ms.\n", next_job_id, slave_rank, timestamp);
+                    printf("\n");
+                    assigned_job_ids[slave_id] = next_job_id;
+                    master_send_message_new_task(slave_rank, next_job_id);
+                    next_job_id++;
+                }
+                // all jobs depleted, tell them go home
+                else{
+                    master_send_message_tasks_depleted(slave_rank);
+                    slaves_informed_that_jobs_depleted++;
+                    
+                    if (assigned_job_ids[slave_id] == -1){
+                        printf("Master: WARN: All jobs depleted and rank %d didn't get any jobs.\n", slave_rank);
+                        printf("\n");
+                    }
+                }
+                break;
+            case MESSAGE_TYPE_SLAVE_JOB_FOUND_BEST_PATH:
+                if(data.best_cost > best_cost_so_far){
+                    print_best_variables(data, slave_rank, assigned_job_ids[slave_id]);
+                    best_cost_so_far = data.best_cost;
+                }
+                break;
+            default:
+                printf("ERROR Master: received unknown message type\n");
+                break;
         }
     }
-
+    
+    printf("All starting vertices have been checked.\n");
     printf("total %lf ms\n", PiraTimer::end("bruteforce").count());
 }
 
-int main() {
-    solveMaxTSP(N, BEST_KNOWN_COST, STARTING_EDGES);
+void slave_job(){
+    // Performs bruteforce searches and sends results to master
+    while(true){
+        slave_send_messsage_ready_for_task();
+        int task_id = slave_receive_task_id();
+        if(task_id == -1){
+            return;
+        }
+        
+		solveMaxTSP(N, BEST_KNOWN_COST, STARTING_EDGES_ARRAY[task_id]);
+    }
+}
+
+int main(int argc, char** argv) {
+    MPI_Init(&argc, &argv);
+
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    
+    if(world_size <= 1){
+        printf("ERROR Expected at least 2 processors. Make sure to specify node count of 2 or above via parameter -n 2.\n");
+    }
+
+    if (world_rank == 0) {
+        master_job();
+    } else {
+        slave_job();
+    }
+    
+    // Wait until all processes finish.
+    MPI_Barrier(MPI_COMM_WORLD);
+    
+    MPI_Finalize();
 }
