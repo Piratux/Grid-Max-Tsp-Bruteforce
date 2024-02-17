@@ -20,7 +20,6 @@ constexpr const int BEST_KNOWN_COST = 0; // Discards all paths whose cost is low
 // WARNING: it will not work when outter grid points are connected in anti-clockwise manner.
 // - 4x4 grid invalid edges: {{5, 1}, {2, 3}}.
 // - 4x4 grid valid edges: {{1, 5}, {3, 2}}.
-//vector<vector<int>> starting_edges = { {1, 6}, {10, 11} };
 const vector<vector<int>> STARTING_EDGES = { {1, 6}, {10, 11} };
 
 // Helper structures and functions
@@ -47,7 +46,6 @@ min_or_max_result array_min(const vector<int>& arr, size_t max_elements_to_walk_
 
 // Returns index of first occurence of value.
 // If element was not found, -1 is returned
-// Assumes arr is not empty
 int array_find(const vector<int>& arr, size_t max_elements_to_search_through, int value) {
     for (int i = 0; i < min(arr.size(), max_elements_to_search_through); i++) {
         if (arr[i] == value) {
