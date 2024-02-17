@@ -1,7 +1,9 @@
-#include <iostream>
-#include <cmath>
 #include <vector>
 #include <numeric>
+
+#include <cstdio>
+#include <cmath>
+#include <cstdint>
 
 #include "PiraTimer.h"
 
@@ -56,9 +58,9 @@ int array_find(const vector<int>& arr, size_t max_elements_to_search_through, in
     return -1;
 }
 
-void print_variables(int total_routes, const vector<vector<int>>& edges, int best_cost, int h) {
+void print_variables(int64_t total_routes, const vector<vector<int>>& edges, int best_cost, int h) {
     if (total_routes % 10000000 == 0) {
-        printf("Iterations: %d\n", total_routes);
+        printf("Iterations: %lld\n", total_routes);
 
         printf("edge_order:\n");
         for (int i = 0; i < h; ++i) {
@@ -74,7 +76,7 @@ void print_variables(int total_routes, const vector<vector<int>>& edges, int bes
     }
 }
 
-void print_best_variables(const vector<int>& best_route, const vector<vector<int>>& edges, int best_cost, int h, int total_routes) {
+void print_best_variables(const vector<int>& best_route, const vector<vector<int>>& edges, int best_cost, int h, int64_t total_routes) {
     printf("best_route:\n");
     for (int i = 0; i < best_route.size(); ++i) {
         printf("%d ", best_route[i] + 1);
@@ -97,13 +99,13 @@ void print_best_variables(const vector<int>& best_route, const vector<vector<int
 
     printf("best_cost: %d\n", best_cost);
 
-    printf("routes_in_total: %d\n", total_routes);
+    printf("routes_in_total: %lld\n", total_routes);
     printf("time1 %lf ms\n", PiraTimer::end("bruteforce").count());
     printf("\n");
 }
 
-void print_final_variables(int total_routes, int best_cost, int cost0, const vector<int>& best_route, int routes_in_total) {
-    printf("Total number of routes: %d\n", total_routes);
+void print_final_variables(int64_t total_routes, int best_cost, int cost0, const vector<int>& best_route, int64_t routes_in_total) {
+    printf("Total number of routes: %lld\n", total_routes);
 
     if (best_cost > cost0) {
         printf("Optimal route:\n");
@@ -120,7 +122,7 @@ void print_final_variables(int total_routes, int best_cost, int cost0, const vec
 
         printf("Optimal_cost: %d\n", best_cost);
 
-        printf("Optimal route was: %d\n", routes_in_total);
+        printf("Optimal route was: %lld\n", routes_in_total);
     }
 }
 
@@ -556,7 +558,7 @@ void solveMaxTSP(const int n) {
     vector<int> best_route(n2, 0); // #INDEXES_FROM_0
     int cost0 = BEST_KNOWN_COST; // #VALUE (UNUSED?)
     int best_cost = cost0; // #VALUE
-    int total_routes = 0; // #VALUE
+    int64_t total_routes = 0; // #VALUE
 
     // For backtracking we need to remember current distance matrix,
     // current rowand column numbers, current pathsand cost of current partial
@@ -600,7 +602,7 @@ void solveMaxTSP(const int n) {
     int ma2 = 0; // #VALUE
     vector<vector<int>> Anew(m, vector<int>(m, 0));
     vector<int> opposite(2, 0); // #INDEXES_FROM_0
-    int routes_in_total = 0; // #VALUE
+    int64_t routes_in_total = 0; // #VALUE
     vector<int> temp_arr(m, 0); // Used when copying arrays to avoid overlap issue
     vector<vector<int>> A_last(m, vector<int>(m, 0));
     vector<vector<int>> A_old(m, vector<int>(m, 0));
