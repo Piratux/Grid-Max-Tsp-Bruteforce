@@ -12,8 +12,15 @@
 
 using namespace std;
 
-constexpr const int N = 4; // Grid size
-constexpr const int BEST_KNOWN_COST = 0; // Discards all paths whose cost is lower than this number, potentially finding better paths faster.
+// Grid size
+constexpr const int N = 4;
+
+// Discards all paths whose cost is lower than this number, potentially finding better paths faster.
+constexpr const int BEST_KNOWN_COST = 0; 
+
+// Every x iterations, send current edges to master node for printing.
+// Set this number to 0 or negative, to disable printing intermediate edges.
+constexpr const int64_t SHARE_INTERMEDIATE_EDGES_EVERY_X_ITERATIONS = 200; 
 
 // List of starting edges, that can be specified in any order.
 // Algorithm will find best path that includes these edges.
@@ -41,6 +48,7 @@ const int MESSAGE_TYPE_MASTER_JOBS_TASKS_DEPLETED = 1;
 
 const int MESSAGE_TYPE_SLAVE_JOB_FOUND_BEST_PATH = 0;
 const int MESSAGE_TYPE_SLAVE_JOB_READY_FOR_TASK = 1;
+const int MESSAGE_TYPE_SLAVE_JOB_SHARE_INTERMEDIATE_EDGES = 2;
 
 // Preferably, we should create different packets for different message types.
 // But since we're lazy, we'll just reuse this one for multiple message types.
@@ -53,7 +61,11 @@ struct CommunicationData{
     
     // slave data
     int path_indexes[n2];
+    int edges[n2][2];
     int best_cost;
+    int h;
+    bool is_final_path;
+    int64_t total_routes;
 };
 
 // Helper structures and functions
@@ -62,13 +74,37 @@ struct min_or_max_result {
     int value = 0;
 };
 
-void share_best_variables(const vector<int>& path_indexes, int best_cost){
+void share_best_variables(const vector<int>& path_indexes, int best_cost, bool is_final_path){
     CommunicationData data;
     for(int i = 0; i < n2; i++){
         data.path_indexes[i] = path_indexes[i];
     }
     data.best_cost = best_cost;
+    data.is_final_path = is_final_path;
     data.message_type = MESSAGE_TYPE_SLAVE_JOB_FOUND_BEST_PATH;
+    MPI_Send(&data, sizeof(data), MPI_BYTE, MASTER_RANK, 0, MPI_COMM_WORLD);
+}
+
+void share_intermediate_variables(int64_t total_routes, const vector<vector<int>>& edges, int best_cost, int h){
+    if(SHARE_INTERMEDIATE_EDGES_EVERY_X_ITERATIONS <= 0){
+        return;
+    }
+    
+    if (total_routes % SHARE_INTERMEDIATE_EDGES_EVERY_X_ITERATIONS != 0){
+        return;
+    }
+    
+    CommunicationData data;
+    for (int i = 0; i < h; ++i) {
+        for (int j = 0; j < 2; ++j) {
+            data.edges[i][j] = edges[i][j];
+        }
+    }
+
+    data.best_cost = best_cost;
+    data.total_routes = total_routes;
+    data.h = h;
+    data.message_type = MESSAGE_TYPE_SLAVE_JOB_SHARE_INTERMEDIATE_EDGES;
     MPI_Send(&data, sizeof(data), MPI_BYTE, MASTER_RANK, 0, MPI_COMM_WORLD);
 }
 
@@ -90,6 +126,24 @@ void print_best_variables(const CommunicationData& result_data, int from_rank, i
     printf("best_cost: %d\n", result_data.best_cost);
 
     printf("time %lf ms\n", PiraTimer::end("bruteforce").count());
+    printf("\n");
+}
+
+void print_variables(const CommunicationData& result_data, int from_rank, int job_id) {
+    printf("intermediate variables shared by rank %d for job id %d\n", from_rank, job_id);
+    printf("iterations: %" PRId64 "\n", result_data.total_routes);
+
+    printf("edge_order:\n");
+    for (int i = 0; i < result_data.h; ++i) {
+        for (int j = 0; j < 2; ++j) {
+            printf("%d ", result_data.edges[i][j] + 1);
+        }
+        printf("\n");
+    }
+
+    printf("current_cost: %d\n", result_data.best_cost);
+
+    printf("time2 %lf ms\n", PiraTimer::end("bruteforce").count());
     printf("\n");
 }
 
@@ -677,6 +731,7 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
                 // Instead of finishing current iteration, we move
                 // to next iteration of the most inner cycle(instruction "break").
                 total_routes++;
+                share_intermediate_variables(total_routes, edges, best_cost, h);
                 break;
             }
 
@@ -920,6 +975,7 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
                 calculate_min_and_factor();
                 if (factor == 0) {
                     total_routes++;
+                    share_intermediate_variables(total_routes, edges, best_cost, h);
                     break;
                 }
 
@@ -929,6 +985,7 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
                 // we go to new iteration.
                 if (d == 1 && A[0][0] == 0) {
                     total_routes++;
+                    share_intermediate_variables(total_routes, edges, best_cost, h);
                     break;
                 }
 
@@ -958,6 +1015,7 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
 
                 if (dist + S + c0 < best_cost) {
                     total_routes++;
+                    share_intermediate_variables(total_routes, edges, best_cost, h);
                     break;
                 }
             }
@@ -969,6 +1027,8 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
             // It remains to check if the new route is better than the best found before.
             if (d == 1 && A[0][0] > 0) {
                 total_routes++;
+                share_intermediate_variables(total_routes, edges, best_cost, h);
+                
                 for (int i = 0; i < paths[opposite[1]].size(); i++) {
                     M[i] = paths[opposite[1]][i];
                 }
@@ -979,7 +1039,7 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
                     }
                     best_cost = dist;
                     routes_in_total = total_routes;
-					share_best_variables(best_route, best_cost);
+					share_best_variables(best_route, best_cost, false);
                 }
             }
         }
@@ -1000,6 +1060,8 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
             dist = costs[h];
         }
     }
+
+    share_best_variables(best_route, best_cost, true);
 }
 
 void master_send_message_new_task(int slave_rank, int next_job_id){
@@ -1104,10 +1166,13 @@ void master_job(){
                 }
                 break;
             case MESSAGE_TYPE_SLAVE_JOB_FOUND_BEST_PATH:
-                if(data.best_cost > best_cost_so_far){
+                if(data.best_cost > best_cost_so_far || data.is_final_path){
                     print_best_variables(data, slave_rank, assigned_job_ids[slave_id]);
                     best_cost_so_far = data.best_cost;
                 }
+                break;
+            case MESSAGE_TYPE_SLAVE_JOB_SHARE_INTERMEDIATE_EDGES:
+                print_variables(data, slave_rank, assigned_job_ids[slave_id]);
                 break;
             default:
                 printf("ERROR Master: received unknown message type\n");
