@@ -286,26 +286,26 @@ vector<vector<int>> gen_dist(int n, const vector<vector<int>>& pnum, const vecto
     // Now we have to restore the distances for some pairs of vertices that
     // belong to the same boundary
 
-    for (int k = 0; k < n - 1; ++k) {
-        int i = pnum[k][0];
-        int j = pnum[k + 1][0];
+    for (int k=0; k<n-1; ++k) {
+		int i = pnum[k+1][0];
+		int j = pnum[k][0];
         A[i][j] = 1;
-    }
-    for (int k = 1; k < n; ++k) {
-        int i = pnum[k][n - 1];
-        int j = pnum[k - 1][n - 1];
+	}
+	for (int k=1; k<n; ++k) {
+		int i = pnum[k-1][n-1];
+		int j = pnum[k][n-1];
         A[i][j] = 1;
-    }
-    for (int k = 1; k < n; ++k) {
-        int i = pnum[0][k];
-        int j = pnum[0][k - 1];
+	}
+	for (int k=1; k<n; ++k) {
+		int i = pnum[0][k-1];
+		int j = pnum[0][k];
         A[i][j] = 1;
-    }
-    for (int k = 0; k < n - 1; ++k) {
-        int i = pnum[n - 1][k];
-        int j = pnum[n - 1][k + 1];
+	}
+	for (int k=0; k<n-1; ++k) {
+		int i = pnum[n-1][k+1];
+		int j = pnum[n-1][k];
         A[i][j] = 1;
-    }
+	}	
 
     // Finally, we consider all diagonals as well as horizontals and verticals
     // and change distance to zero if two vertices are not seen from each other in the grid
@@ -606,11 +606,11 @@ void solveMaxTSP(const int n, const int best_known_cost, const vector<vector<int
     vector<vector<int>> pind(n2, vector<int>(2)); // #INDEXES_FROM_0
     int k = 0; // #INDEXES_FROM_0
 
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            pnum[i][j] = k;
-            pind[k][0] = i;
-            pind[k][1] = j;
+    for (int y = 0; y < n; ++y) {
+        for (int x = 0; x < n; ++x) {
+            pnum[x][y] = k;
+            pind[k][0] = x;
+            pind[k][1] = y;
             k = k + 1;
         }
     }
